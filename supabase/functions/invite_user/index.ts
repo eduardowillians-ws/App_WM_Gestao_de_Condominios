@@ -7,144 +7,126 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('Invite function called');
-  
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    console.log('URL:', supabaseUrl ? 'OK' : 'MISSING');
-    console.log('Anon Key:', supabaseAnonKey ? 'OK' : 'MISSING');
-    console.log('Service Key:', supabaseServiceKey ? 'OK' : 'MISSING');
+    // Debug das variáveis
+    console.log('ENV CHECK:', { 
+      url: supabaseUrl ? 'OK' : 'MISSING',
+      anonKey: supabaseAnonKey ? 'OK' : 'MISSING', 
+      serviceKey: supabaseServiceKey ? 'OK' : 'MISSING'
+    });
 
-    // Criar cliente com a chave pública (anon) para validar token
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: "Configuração missing - variáveis de ambiente não encontradas" 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
+    }
+
     const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
-
-    // Criar cliente com service role para operações admin
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const { email, name, unit, role } = await req.json();
-    console.log('Request body:', { email, name, unit, role });
     
-    // Validações
     if (!email || !role) {
       return new Response(JSON.stringify({ success: false, error: "Email e role são obrigatórios" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 400,
       });
     }
 
-    // Roles válidos (não permite admin)
     const validRoles = ['manager', 'resident'];
     if (!validRoles.includes(role)) {
-      return new Response(JSON.stringify({ success: false, error: "Role inválida. Use: manager ou resident" }), {
+      return new Response(JSON.stringify({ success: false, error: "Role inválida" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 400,
       });
     }
 
-    let origin = req.headers.get('origin') || 'http://localhost:3000';
-    if (origin.endsWith('/')) {
-        origin = origin.slice(0, -1);
-    }
-
-    // Verifica se o usuário que está fazendo a request é admin
     const authHeader = req.headers.get('Authorization');
-    console.log('Auth header:', authHeader ? 'Present' : 'Missing');
-    
     if (!authHeader) {
-      return new Response(JSON.stringify({ success: false, error: "Não autorizado - faça login" }), {
+      return new Response(JSON.stringify({ success: false, error: "Sem token de autorização" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 401,
       });
     }
 
     const token = authHeader.replace('Bearer ', '');
+    console.log('Validating token...');
+    
     const { data: { user }, error: authError } = await supabasePublic.auth.getUser(token);
-    console.log('Auth error:', authError);
-    console.log('User:', user ? 'Found' : 'Not found');
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ success: false, error: "Token inválido ou expirado" }), {
+      console.log('Auth error:', authError);
+      return new Response(JSON.stringify({ success: false, error: "Token inválido: " + authError?.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 401,
       });
     }
 
-    // Verifica no perfil se é admin
+    console.log('User authenticated:', user.id);
+
+    // Verifica role no perfil
     const { data: profile } = await supabasePublic
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    console.log('Profile:', profile);
-    
+    console.log('Profile role:', profile?.role);
+
     if (profile?.role !== 'admin') {
-      return new Response(JSON.stringify({ success: false, error: "Apenas administradores podem convidar novos usuários" }), {
+      return new Response(JSON.stringify({ success: false, error: "Usuário não é admin" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 403,
       });
     }
 
-    // Convida o usuário usando admin client
-    console.log('Inviting user:', email);
+    // Convida usuário
+    const origin = req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
+    const cleanOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+
+    console.log('Inviting:', email);
+    
     const { data: userData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: origin
+      redirectTo: cleanOrigin
     });
 
-    console.log('Invite error:', inviteError);
-    console.log('Invite data:', userData);
-
     if (inviteError) {
+      console.log('Invite error:', inviteError);
       return new Response(JSON.stringify({ success: false, error: inviteError.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 400,
       });
     }
 
-    if (!userData || !userData.user) {
-      return new Response(JSON.stringify({ success: false, error: "Usuário não foi criado. Provavelmente já existe!" }), {
+    if (!userData?.user) {
+      return new Response(JSON.stringify({ success: false, error: "Falha ao criar usuário" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 400,
       });
     }
 
     const userId = userData.user.id;
-    console.log('User created with ID:', userId);
-
-    // Atualiza o perfil com name, unit E role usando admin client
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .update({ 
-        name: name || email,
-        unit: unit || null,
-        role: role
-      })
-      .eq('id', userId);
-
-    console.log('Profile update error:', profileError);
-
-    const roleLabel = role === 'manager' ? 'Zelador/Gestor' : 'Morador';
+    await supabaseAdmin.from('profiles').update({ name: name || email, unit: unit || null, role }).eq('id', userId);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: `${roleLabel} convidado com sucesso!`,
-      user: userData.user 
+      message: role === 'manager' ? 'Zelador convidado!' : 'Morador convidado!'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
     });
   } catch (error: any) {
-    console.log('Catch error:', error);
+    console.log('Error:', error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: 500,
     });
   }
 });
