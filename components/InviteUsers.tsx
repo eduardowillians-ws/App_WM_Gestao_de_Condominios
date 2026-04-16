@@ -29,7 +29,14 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
         body: { email, name, unit, role }
       });
 
-      if (error || !data?.success) {
+      console.log('Invite response:', data, error);
+
+      if (error) {
+        setMessage({ type: 'error', text: error.message || 'Erro de conexão' });
+        return;
+      }
+
+      if (!data?.success) {
         setMessage({ type: 'error', text: data?.error || 'Erro ao convidar usuário' });
         return;
       }
@@ -40,6 +47,7 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
       setUnit('');
       setRole('resident');
     } catch (err: any) {
+      console.error('Invite error:', err);
       setMessage({ type: 'error', text: err.message || 'Erro ao convidar usuário' });
     } finally {
       setLoading(false);
