@@ -5,6 +5,7 @@ import { View, AreaReserva, ManualCategory } from './types';
 export const MENU_ITEMS = [
   { id: View.DASHBOARD, label: 'Início', icon: <i className="fa-solid fa-house"></i> },
   { id: View.MANUAL_SINDICO, label: 'Manual do Síndico', icon: <i className="fa-solid fa-book-open-reader"></i> },
+  { id: View.CONVIDAR_USUARIOS, label: 'Convidar Usuários', icon: <i className="fa-solid fa-user-plus"></i> },
   { id: View.MORADORES, label: 'Moradores & Unidades', icon: <i className="fa-solid fa-users"></i> },
   { id: View.VISITANTES, label: 'Acesso / Visitantes', icon: <i className="fa-solid fa-id-card"></i> },
   { id: View.OCORRENCIAS, label: 'Ocorrências & Reclamações', icon: <i className="fa-solid fa-pen-to-square"></i> },

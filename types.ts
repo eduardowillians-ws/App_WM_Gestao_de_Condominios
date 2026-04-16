@@ -13,7 +13,8 @@ export enum View {
   EQUIPE = 'EQUIPE',
   MORADORES = 'MORADORES',
   MANUAL_SINDICO = 'MANUAL_SINDICO',
-  MEU_PERFIL = 'MEU_PERFIL'
+  MEU_PERFIL = 'MEU_PERFIL',
+  CONVIDAR_USUARIOS = 'CONVIDAR_USUARIOS'
 }
 
 export interface TechnicalItem {

@@ -16,6 +16,7 @@ import ManualSindico from './components/ManualSindico';
 import ChatBot from './components/ChatBot';
 import Login from './components/Login';
 import MeuPerfil from './components/MeuPerfil';
+import InviteUsers from './components/InviteUsers';
 import { View, User } from './types';
 import { supabase } from './lib/supabase';
 
@@ -85,6 +86,11 @@ const App: React.FC = () => {
     const isResident = currentUser.role === 'resident';
     const isManager = currentUser.role === 'manager';
 
+    // Se resident tentar acessar DASHBOARD via URL, redireciona para votacao
+    if (activeView === View.DASHBOARD && isResident) {
+      return <Assembleias userRole={currentUser.role} currentUser={currentUser} />;
+    }
+
     switch (activeView) {
       case View.DASHBOARD: return <Dashboard />;
       case View.ENCOMENDAS: return <Encomendas />;
@@ -111,12 +117,15 @@ const App: React.FC = () => {
         if (isResident || isManager) return <Dashboard />;
         return <Documentos />;
       case View.MANUAL_SINDICO:
-        if (currentUser.role === 'resident') return <Dashboard />;
+        if (currentUser.role === 'resident') return <Assembleias userRole={currentUser.role} currentUser={currentUser} />;
         return <ManualSindico 
           onNavigate={setActiveView} 
           isAdmin={currentUser.role === 'admin'}
           currentUser={currentUser}
         />;
+      case View.CONVIDAR_USUARIOS:
+        if (currentUser.role !== 'admin') return <Dashboard />;
+        return <InviteUsers currentUser={currentUser} />;
       case View.MEU_PERFIL:
         return <MeuPerfil currentUser={currentUser} />;
       default:

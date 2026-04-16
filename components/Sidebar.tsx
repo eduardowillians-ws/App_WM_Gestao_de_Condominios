@@ -12,12 +12,12 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, currentUser }) => {
   // Filtro de itens de menu baseado no Cargo (Role)
   const filteredMenuItems = MENU_ITEMS.filter(item => {
+    // Admin vê tudo (não precisa de verificação extra pois já tem Dashboard)
     if (currentUser.role === 'admin') return true;
 
     // Acesso do Morador (resident)
     if (currentUser.role === 'resident') {
       return [
-        View.DASHBOARD,
         View.VOTACAO,
         View.ENCOMENDAS,
         View.RESERVAS,
