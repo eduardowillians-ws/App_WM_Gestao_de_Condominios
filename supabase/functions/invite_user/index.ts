@@ -12,7 +12,14 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
+    // Criar cliente com a chave pública (anon) para validar token
+    const supabasePublic = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    // Criar cliente com service role para operações admin
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
@@ -27,10 +34,10 @@ serve(async (req) => {
       });
     }
 
-    // Roles válidos
-    const validRoles = ['admin', 'manager', 'resident'];
+    // Roles válidos (não permite admin)
+    const validRoles = ['manager', 'resident'];
     if (!validRoles.includes(role)) {
-      return new Response(JSON.stringify({ success: false, error: "Role inválida. Use: admin, manager ou resident" }), {
+      return new Response(JSON.stringify({ success: false, error: "Role inválida. Use: manager ou resident" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
@@ -44,24 +51,24 @@ serve(async (req) => {
     // Verifica se o usuário que está fazendo a request é admin
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ success: false, error: "Não autorizado" }), {
+      return new Response(JSON.stringify({ success: false, error: "Não autorizado - faça login" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabasePublic.auth.getUser(token);
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ success: false, error: "Token inválido" }), {
+      return new Response(JSON.stringify({ success: false, error: "Token inválido ou expirado" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
     // Verifica no perfil se é admin
-    const { data: profile } = await supabaseClient
+    const { data: profile } = await supabasePublic
       .from('profiles')
       .select('role')
       .eq('id', user.id)
@@ -74,8 +81,8 @@ serve(async (req) => {
       });
     }
 
-    // Convida o usuário
-    const { data: userData, error: inviteError } = await supabaseClient.auth.admin.inviteUserByEmail(email, {
+    // Convida o usuário usando admin client
+    const { data: userData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: origin
     });
 
@@ -95,8 +102,8 @@ serve(async (req) => {
 
     const userId = userData.user.id;
 
-    // Atualiza o perfil com name, unit E role
-    const { error: profileError } = await supabaseClient
+    // Atualiza o perfil com name, unit E role usando admin client
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ 
         name: name || email,
@@ -109,7 +116,7 @@ serve(async (req) => {
       console.warn("Aviso: Convite enviado, mas falha ao atualizar o perfil:", profileError);
     }
 
-    const roleLabel = role === 'admin' ? 'Administrador' : role === 'manager' ? 'Zelador/Gestor' : 'Morador';
+    const roleLabel = role === 'manager' ? 'Zelador/Gestor' : 'Morador';
 
     return new Response(JSON.stringify({ 
       success: true, 
