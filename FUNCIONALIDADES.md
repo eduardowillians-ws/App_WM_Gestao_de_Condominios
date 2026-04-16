@@ -265,3 +265,21 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 - ✅ Tipos: MORADOR, VISITANTE, PRESTADOR, ENTREGA
 - ✅ Campos: block_id, unit, name, document, direction, created_at
 - ✅ Integração com gráfico de fluxo de acessos
+
+### v2.2 - Formulário de Registro de Acesso:
+- ✅ Botão "Registrar Morador" com seleção em cascata: Bloco → Apartamento → Morador
+- ✅ Botão "Registrar Visitante" com mesma lógica de apartamentos
+- ✅ Máscara de documento (CPF/RG) com seletor de tipo
+- ✅ Preenchimento automático de profile_id e CPF do morador
+
+### v2.3 - Ocorrências e Reclamações Separadas:
+- ✅ Card "Ocorrências": Total, Pendentes, Concluídas (dados reais)
+- ✅ Card "Reclamações": Total, Pendentes, Concluídas (dados reais)
+- ✅ Filtros de mês/ano funcionando corretamente
+
+### v2.4 - KPIs do Nível de Gestão com Dados Reais:
+- ✅ Saúde Financeira: saldo de financial (receitas - despesas)
+- ✅ Ocupação: percentual real (moradores/unidades)
+- ✅ Taxa de Ocorrências: pendentes reais
+- ✅ Crescimento de Áreas: reservas do mês atual
+- ✅ Eficiência Logística: encomendas pendentes +5 dias

@@ -111,6 +111,7 @@ const App: React.FC = () => {
         if (isResident || isManager) return <Dashboard />;
         return <Documentos />;
       case View.MANUAL_SINDICO:
+        if (currentUser.role === 'resident') return <Dashboard />;
         return <ManualSindico 
           onNavigate={setActiveView} 
           isAdmin={currentUser.role === 'admin'}

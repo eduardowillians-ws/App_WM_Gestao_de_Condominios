@@ -21,8 +21,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, currentUser
         View.VOTACAO,
         View.ENCOMENDAS,
         View.RESERVAS,
-        View.OCORRENCIAS,
-        View.MANUAL_SINDICO // Morador pode ver as melhorias e transparência técnica
+        View.OCORRENCIAS
       ].includes(item.id);
     }
 
