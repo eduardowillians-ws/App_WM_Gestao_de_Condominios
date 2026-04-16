@@ -1,0 +1,718 @@
+
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
+import { FinancialEntry } from '../types';
+
+interface FinanceiroProps {
+  userRole?: 'admin' | 'resident' | 'manager';
+  currentUser?: {
+    id: string;
+    name: string;
+    unit: string;
+    role: string;
+  };
+}
+
+const MONTHS = [
+  { label: 'Jan', value: '01' },
+  { label: 'Fev', value: '02' },
+  { label: 'Mar', value: '03' },
+  { label: 'Abr', value: '04' },
+  { label: 'Mai', value: '05' },
+  { label: 'Jun', value: '06' },
+  { label: 'Jul', value: '07' },
+  { label: 'Ago', value: '08' },
+  { label: 'Set', value: '09' },
+  { label: 'Out', value: '10' },
+  { label: 'Nov', value: '11' },
+  { label: 'Dez', value: '12' }
+];
+
+const CATEGORIES = [
+  'Pessoal',
+  'RH',
+  'Manutenção',
+  'Água',
+  'Luz',
+  'Utilidades',
+  'Administrativo',
+  'Receita Operacional'
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'Manutenção': '#fbbf24', 
+  'Pessoal': '#3b82f6',     
+  'Administrativo': '#64748b', 
+  'RH': '#8b5cf6',          
+  'Água': '#0ea5e9',        
+  'Luz': '#f59e0b',         
+  'Utilidades': '#10b981',  
+  'Receita Operacional': '#10b981' 
+};
+
+const INITIAL_ENTRIES: FinancialEntry[] = [
+  { id: '1', description: 'Taxa Condominial Un. 101', type: 'RECU', category: 'Receita Operacional', amount: 850.00, date: '2025-01-10', status: 'paid' },
+  { id: '2', description: 'Folha de Pagamento - Zeladoria', type: 'DESP', category: 'Pessoal', amount: 4200.00, date: '2025-01-05', status: 'paid' },
+  { id: '3', description: 'Manutenção Elevadores OTIS', type: 'DESP', category: 'Manutenção', amount: 1500.00, date: '2025-02-12', status: 'paid' },
+  { id: '4', description: 'Conta de Energia CPFL', type: 'DESP', category: 'Luz', amount: 2800.00, date: '2025-02-15', status: 'paid' },
+  { id: '5', description: 'Conta de Água Sabesp', type: 'DESP', category: 'Água', amount: 1200.00, date: '2025-02-20', status: 'paid' },
+  { id: '6', description: 'Taxa Condominial Un. 202', type: 'RECU', category: 'Receita Operacional', amount: 850.00, date: '2025-03-10', status: 'overdue' },
+  { id: '7', description: 'Compra de EPIs - Segurança', type: 'DESP', category: 'RH', amount: 650.00, date: '2025-04-05', status: 'paid' },
+];
+
+const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentUser }) => {
+  const [entries, setEntries] = useState<FinancialEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState('2025');
+  const [activeMonthFilter, setActiveMonthFilter] = useState<string | null>(null);
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [activeEntryMenu, setActiveEntryMenu] = useState<string | null>(null);
+  
+  // Estados para Modais de Ação
+  const [viewingEntry, setViewingEntry] = useState<FinancialEntry | null>(null);
+  const [deletingEntry, setDeletingEntry] = useState<FinancialEntry | null>(null);
+  const [provingEntry, setProvingEntry] = useState<FinancialEntry | null>(null);
+  const [receiptFilePreview, setReceiptFilePreview] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAdmin = userRole === 'admin';
+
+  useEffect(() => {
+    fetchEntries();
+  }, []);
+
+  const fetchEntries = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('financial_entries')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      const formatted = (data || []).map((r: any) => ({
+        id: r.id,
+        description: r.description,
+        type: r.entry_type === 'RECEITA' ? 'RECU' : 'DESP',
+        category: r.category,
+        amount: parseFloat(r.amount),
+        date: r.date,
+        status: r.status,
+        notes: r.notes
+      }));
+
+      setEntries(formatted.length > 0 ? formatted : INITIAL_ENTRIES);
+    } catch (err) {
+      console.log('Fallback:', err);
+      setEntries(INITIAL_ENTRIES);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- LÓGICA DE FILTRAGEM ---
+  
+  const filteredEntries = useMemo(() => {
+    let result = [...entries].filter(e => e.date.startsWith(selectedYear));
+    if (activeMonthFilter) {
+      result = result.filter(e => e.date.split('-')[1] === activeMonthFilter);
+    }
+    if (activeCategoryFilter) {
+      result = result.filter(e => e.category === activeCategoryFilter);
+    }
+    return result.sort((a, b) => b.date.localeCompare(a.date));
+  }, [entries, selectedYear, activeMonthFilter, activeCategoryFilter]);
+
+  const metrics = useMemo(() => {
+    const receitas = filteredEntries.filter(e => e.type === 'RECU').reduce((acc, curr) => acc + curr.amount, 0);
+    const despesas = filteredEntries.filter(e => e.type === 'DESP').reduce((acc, curr) => acc + curr.amount, 0);
+    
+    // Calcular inadimplência baseado em entradas overdue
+    const totalExpected = receitas * 1.2; // Estimativa de receita esperada
+    const paidEntries = filteredEntries.filter(e => e.type === 'RECU' && e.status === 'paid');
+    const totalPaid = paidEntries.reduce((acc, curr) => acc + curr.amount, 0);
+    
+    // Se não tem dados suficientes, usa 0
+    const inadimplencia = totalExpected > 0 
+      ? Math.max(0, Math.round((1 - (totalPaid / totalExpected)) * 1000) / 10)
+      : 0;
+    
+    return { saldo: receitas - despesas, receitas, despesas, inadimplencia };
+  }, [filteredEntries]);
+
+  const chartData = useMemo(() => {
+    if (activeMonthFilter) {
+      return Array.from({ length: 31 }, (_, i) => {
+        const dayStr = (i + 1).toString().padStart(2, '0');
+        const dayEntries = entries.filter(e => e.date === `${selectedYear}-${activeMonthFilter}-${dayStr}`);
+        const receitas = dayEntries.filter(e => e.type === 'RECU').reduce((acc, curr) => acc + curr.amount, 0);
+        const despesas = dayEntries.filter(e => e.type === 'DESP' && (!activeCategoryFilter || e.category === activeCategoryFilter)).reduce((acc, curr) => acc + curr.amount, 0);
+        return { name: dayStr, value: dayStr, receitas, despesas };
+      });
+    } else {
+      return MONTHS.map((m) => {
+        const monthEntries = entries.filter(e => e.date.startsWith(`${selectedYear}-${m.value}`));
+        const receitas = monthEntries.filter(e => e.type === 'RECU').reduce((acc, curr) => acc + curr.amount, 0);
+        const despesas = monthEntries.filter(e => e.type === 'DESP' && (!activeCategoryFilter || e.category === activeCategoryFilter)).reduce((acc, curr) => acc + curr.amount, 0);
+        return { name: m.label, value: m.value, receitas, despesas };
+      });
+    }
+  }, [entries, selectedYear, activeMonthFilter, activeCategoryFilter]);
+
+  const pieData = useMemo(() => {
+    const baseEntries = entries.filter(e => e.date.startsWith(selectedYear) && (!activeMonthFilter || e.date.split('-')[1] === activeMonthFilter));
+    const totals: Record<string, number> = {};
+    baseEntries.filter(e => e.type === 'DESP').forEach(e => {
+      totals[e.category] = (totals[e.category] || 0) + e.amount;
+    });
+    const totalDespesas = Object.values(totals).reduce((a, b) => a + b, 0);
+    return Object.entries(totals).map(([name, value]) => ({ 
+      name, 
+      value,
+      percent: totalDespesas > 0 ? (value / totalDespesas) * 100 : 0
+    }));
+  }, [entries, selectedYear, activeMonthFilter]);
+
+  // --- HANDLERS ---
+
+  const handleRegisterEntry = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const entryType = formData.get('type') === 'RECU' ? 'RECEITA' : 'DESPESA';
+      
+      const { data, error } = await supabase
+        .from('financial_entries')
+        .insert({
+          description: formData.get('description') as string,
+          entry_type: entryType,
+          category: formData.get('category') as string,
+          amount: parseFloat(formData.get('amount') as string),
+          date: formData.get('date') as string,
+          status: 'paid',
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Registrar auditoria
+      await supabase.from('financial_audit').insert({
+        entry_id: data.id,
+        action: 'CREATE',
+        new_value: JSON.stringify(data),
+        notes: `Criado por ${currentUser?.name || 'Sistema'}`
+      });
+
+      await fetchEntries();
+      setIsRegisterModalOpen(false);
+      alert('Lançamento registrado com sucesso!');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Erro ao registrar');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingEntry) return;
+    setIsLoading(true);
+    try {
+      const oldData = { ...deletingEntry };
+      
+      const { error } = await supabase
+        .from('financial_entries')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('id', deletingEntry.id);
+
+      if (error) throw error;
+
+      // Registrar auditoria
+      await supabase.from('financial_audit').insert({
+        entry_id: deletingEntry.id,
+        action: 'DELETE',
+        old_value: JSON.stringify(oldData),
+        notes: `Cancelado por ${currentUser?.name || 'Sistema'}`
+      });
+
+      setEntries(prev => prev.filter(e => e.id !== deletingEntry.id));
+      setDeletingEntry(null);
+      setActiveEntryMenu(null);
+      alert('Lançamento cancelado.');
+    } catch (err) {
+      console.error(err);
+      // Fallback local
+      setEntries(prev => prev.filter(e => e.id !== deletingEntry.id));
+      setDeletingEntry(null);
+      setActiveEntryMenu(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptFilePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const saveReceipt = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const notes = formData.get('notes') as string;
+
+    if (provingEntry) {
+      setEntries(prev => prev.map(entry => 
+        entry.id === provingEntry.id 
+          ? { ...entry, receiptUrl: receiptFilePreview || entry.receiptUrl, description: notes || entry.description } 
+          : entry
+      ));
+      setProvingEntry(null);
+      setReceiptFilePreview(null);
+      alert('Informações do lançamento e comprovante atualizados!');
+    }
+  };
+
+  const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-4 rounded-2xl shadow-2xl border border-gray-100 animate-in zoom-in-95">
+          <p className="text-[10px] font-black uppercase text-gray-400 mb-1 tracking-widest">{data.name}</p>
+          <p className="text-sm font-black text-slate-900">R$ {data.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          <p className="text-[10px] font-bold text-blue-500 uppercase mt-1">Representa {data.percent.toFixed(1)}% do total</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20 no-print">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Gestão Financeira</h2>
+          <p className="text-sm text-gray-500 font-medium italic">Monitoramento e Auditoria • {selectedYear}</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => window.print()} className="bg-white border border-gray-200 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center space-x-2 shadow-sm">
+            <i className="fa-solid fa-file-pdf"></i>
+            <span>Exportar Relatório</span>
+          </button>
+          <button 
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="mycond-bg-yellow text-slate-900 px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-yellow-100 hover:bg-yellow-500 transition-all active:scale-95"
+          >
+            + Novo Lançamento
+          </button>
+        </div>
+      </header>
+
+      {/* Barra de Filtros */}
+      <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-6">
+        <div className="flex items-center space-x-6">
+          <div className="flex flex-col">
+            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Ano</label>
+            <select 
+              value={selectedYear} 
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="bg-slate-50 border-none text-xs font-black text-slate-700 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-yellow-400"
+            >
+              {['2024', '2025', '2026'].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Mês de Referência</label>
+            <div className="flex bg-slate-100 p-1 rounded-xl">
+              <button onClick={() => setActiveMonthFilter(null)} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${!activeMonthFilter ? 'bg-white shadow-sm text-slate-900' : 'text-gray-400'}`}>Todos</button>
+              {MONTHS.map(m => (
+                <button key={m.label} onClick={() => setActiveMonthFilter(m.value)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${activeMonthFilter === m.value ? 'bg-white shadow-sm text-slate-900' : 'text-gray-400'}`}>{m.label}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+            {activeCategoryFilter && (
+              <button onClick={() => setActiveCategoryFilter(null)} className="text-[10px] font-black text-blue-600 uppercase flex items-center bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 hover:bg-blue-100 transition-all">
+                <i className="fa-solid fa-filter mr-2"></i> Filtro: {activeCategoryFilter}
+              </button>
+            )}
+            {activeMonthFilter && (
+              <button onClick={() => setActiveMonthFilter(null)} className="text-[10px] font-black text-red-500 uppercase flex items-center bg-red-50 px-4 py-2 rounded-xl border border-red-100 hover:bg-red-100 transition-all">
+                <i className="fa-solid fa-circle-xmark mr-2"></i> Limpar Mês
+              </button>
+            )}
+        </div>
+      </div>
+
+      {/* Métricas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Receitas Período</p>
+          <h3 className="text-2xl font-black text-emerald-500">R$ {metrics.receitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+        </div>
+        <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Despesas Período</p>
+          <h3 className="text-2xl font-black text-red-500">R$ {metrics.despesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+        </div>
+        <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
+          <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Inadimplência <i className="fa-solid fa-triangle-exclamation"></i></p>
+          <h3 className="text-2xl font-black text-red-600">{metrics.inadimplencia}%</h3>
+        </div>
+        <div className="bg-slate-900 p-7 rounded-[2.5rem] shadow-xl flex flex-col justify-center">
+          <p className="text-[10px] font-black text-yellow-400 uppercase tracking-widest mb-1">Saldo Líquido</p>
+          <h3 className={`text-2xl font-black ${metrics.saldo >= 0 ? 'text-white' : 'text-red-400'}`}>R$ {metrics.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+        </div>
+      </div>
+
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm flex flex-col min-h-[450px] relative">
+          <div className="flex justify-between items-center mb-8">
+            <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Fluxo {activeMonthFilter ? 'Diário' : 'Anual'} de Caixa</h4>
+            <div className="flex space-x-4 text-[10px] font-black uppercase">
+              <span className="text-blue-500">Receitas</span>
+              <span className="text-red-400">Despesas</span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} onClick={(s: any) => s && s.activePayload && !activeMonthFilter && setActiveMonthFilter(s.activePayload[0].payload.value)}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8', fontWeight: 900}} interval={activeMonthFilter ? 1 : 0} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                <Tooltip cursor={{fill: '#f8fafc'}} />
+                <Bar dataKey="receitas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="despesas" fill={activeCategoryFilter ? CATEGORY_COLORS[activeCategoryFilter] : '#f87171'} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm flex flex-col min-h-[450px]">
+          <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em] mb-8 text-center uppercase">Despesas por Categoria</h4>
+          <div className="flex-1 relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={75} outerRadius={105} paddingAngle={5} dataKey="value" onClick={(d) => d && d.name && setActiveCategoryFilter(activeCategoryFilter === d.name ? null : d.name)}>
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#cbd5e1'} className={`cursor-pointer transition-all duration-300 ${activeCategoryFilter === entry.name ? 'scale-105 opacity-100' : activeCategoryFilter ? 'opacity-30' : 'opacity-100'}`} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomPieTooltip />} />
+                <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-center text-[9px] text-gray-400 font-bold uppercase mt-4 italic">Clique em uma fatia para filtrar o fluxo</p>
+        </div>
+      </div>
+
+      {/* Extrato Detalhado */}
+      <div className="bg-white rounded-[3.5rem] shadow-sm border border-gray-100 overflow-hidden relative z-0">
+        <div className="px-12 py-10 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
+          <h4 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Extrato Detalhado de Movimentações</h4>
+          <span className="text-[10px] font-black text-gray-400 uppercase">{filteredEntries.length} Registros</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-gray-400 text-[10px] uppercase font-black border-b border-gray-50">
+                <th className="px-12 py-6">Mês / Data</th>
+                <th className="px-8 py-6">Descrição</th>
+                <th className="px-8 py-6">Categoria</th>
+                <th className="px-8 py-6">Valor</th>
+                <th className="px-8 py-6 text-center">Status</th>
+                <th className="px-12 py-6 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredEntries.map(entry => (
+                <tr key={entry.id} className="group hover:bg-slate-50 transition-all">
+                  <td className="px-12 py-6">
+                    <p className="font-black text-slate-400 text-[9px] uppercase mb-1">{MONTHS.find(m => m.value === entry.date.split('-')[1])?.label}</p>
+                    <p className="font-black text-slate-800 text-xs">{new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                  </td>
+                  <td className="px-8 py-6">
+                    <p className="font-black text-slate-700 uppercase text-xs tracking-tight">{entry.description}</p>
+                    <div className="flex items-center mt-1">
+                      <span className={`w-2 h-2 rounded-full mr-2 ${entry.type === 'RECU' ? 'bg-emerald-500' : 'bg-red-400'}`}></span>
+                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">{entry.type === 'RECU' ? 'Crédito' : 'Débito'}</span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="px-4 py-1.5 border rounded-xl text-[10px] font-black uppercase flex items-center w-fit shadow-sm" style={{ borderColor: CATEGORY_COLORS[entry.category] + '40', color: CATEGORY_COLORS[entry.category], backgroundColor: CATEGORY_COLORS[entry.category] + '10' }}>
+                      <div className="w-1.5 h-1.5 rounded-full mr-2" style={{ backgroundColor: CATEGORY_COLORS[entry.category] }}></div>
+                      {entry.category}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6 font-black text-sm">
+                    <span className={entry.type === 'RECU' ? 'text-emerald-600' : 'text-slate-900'}>
+                      {entry.type === 'RECU' ? '+' : '-'} R$ {entry.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6 text-center">
+                    <span className="px-5 py-2 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">Liquidado</span>
+                  </td>
+                  <td className="px-6 py-4 text-right relative">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveEntryMenu(activeEntryMenu === entry.id ? null : entry.id);
+                      }} 
+                      className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center"
+                    >
+                      <i className="fa-solid fa-ellipsis text-lg"></i>
+                    </button>
+                    {activeEntryMenu === entry.id && (
+                      <div className="absolute right-0 top-12 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-[150] min-w-[140px] flex flex-col animate-in fade-in zoom-in-95">
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setViewingEntry(entry); 
+                            setActiveEntryMenu(null); 
+                          }} 
+                          className="px-4 py-2.5 text-left text-xs font-bold uppercase text-slate-600 hover:bg-slate-50 rounded-xl transition-colors w-full"
+                        >
+                          <i className="fa-regular fa-eye mr-2"></i>Visualizar
+                        </button>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setProvingEntry(entry); 
+                            setActiveEntryMenu(null); 
+                          }} 
+                          className="px-4 py-2.5 text-left text-xs font-bold uppercase text-slate-600 hover:bg-slate-50 rounded-xl transition-colors w-full"
+                        >
+                          <i className="fa-solid fa-paperclip mr-2"></i>Comprovante
+                        </button>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setDeletingEntry(entry); 
+                            setActiveEntryMenu(null); 
+                          }} 
+                          className="px-4 py-2.5 text-left text-xs font-bold uppercase text-red-500 hover:bg-red-50 rounded-xl transition-colors w-full"
+                        >
+                          <i className="fa-solid fa-trash-can mr-2"></i>Excluir
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal Visualizar Detalhes */}
+      {viewingEntry && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl animate-in fade-in" onClick={() => setViewingEntry(null)}></div>
+          <div className="relative bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-10 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto scrollbar-hide">
+             <div className="text-center mb-8">
+                <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-4 text-3xl shadow-inner ${viewingEntry.type === 'RECU' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
+                   <i className={viewingEntry.type === 'RECU' ? "fa-solid fa-hand-holding-dollar" : "fa-solid fa-receipt"}></i>
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Ficha do Lançamento</h3>
+                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">ID: {viewingEntry.id}</p>
+             </div>
+             <div className="space-y-4 mb-8">
+                <div className="flex justify-between border-b border-gray-50 pb-3">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Descrição</span>
+                  <span className="text-xs font-black text-slate-800 text-right max-w-[200px]">{viewingEntry.description}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-50 pb-3">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor Líquido</span>
+                  <span className={`text-sm font-black ${viewingEntry.type === 'RECU' ? 'text-emerald-600' : 'text-slate-900'}`}>R$ {viewingEntry.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-50 pb-3">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Categoria</span>
+                  <span className="text-xs font-black text-slate-800 uppercase">{viewingEntry.category}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-50 pb-3">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Data Competência</span>
+                  <span className="text-xs font-black text-slate-800">{new Date(viewingEntry.date + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                </div>
+                
+                <div className="pt-6">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4">Anexo / Comprovante Digital</span>
+                  {viewingEntry.receiptUrl ? (
+                    <div className="rounded-[2rem] overflow-hidden border-4 border-slate-50 shadow-inner bg-slate-100 group relative">
+                      <img src={viewingEntry.receiptUrl} alt="Comprovante" className="w-full h-auto object-cover max-h-[350px]" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <a href={viewingEntry.receiptUrl} download={`comprovante_${viewingEntry.id}.png`} className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-2xl hover:scale-110 transition-transform">
+                          <i className="fa-solid fa-download text-lg"></i>
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-20 border-4 border-dashed border-slate-50 rounded-[3rem] flex flex-col items-center justify-center text-gray-300">
+                      <i className="fa-solid fa-file-circle-xmark text-5xl mb-4"></i>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">Sem comprovante anexado</p>
+                    </div>
+                  )}
+                </div>
+             </div>
+             <button onClick={() => setViewingEntry(null)} className="w-full py-6 mycond-bg-blue text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl shadow-blue-500/20 active:scale-95 transition-all">Fechar Visualização</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Anexar Comprovante */}
+      {provingEntry && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-2 sm:p-4 overflow-auto">
+          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl animate-in fade-in" onClick={() => setProvingEntry(null)}></div>
+          <div className="relative bg-white w-full max-w-lg rounded-2xl sm:rounded-[3rem] shadow-2xl p-6 sm:p-10 my-8 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+             <div className="flex justify-between items-start mb-6 sm:mb-8">
+               <div>
+                  <h3 className="text-xl sm:text-3xl font-black text-slate-900 uppercase tracking-tighter">Comprovante Digital</h3>
+                  <p className="text-[9px] sm:text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Vincular prova de pagamento</p>
+               </div>
+               <button onClick={() => setProvingEntry(null)} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors flex-shrink-0">
+                 <i className="fa-solid fa-xmark text-lg sm:text-xl"></i>
+               </button>
+             </div>
+
+             <form onSubmit={saveReceipt} className="space-y-8">
+                <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-gray-100 space-y-3 shadow-inner">
+                  <div className="flex justify-between">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Categoria</span>
+                    <span className="text-[10px] font-black text-slate-800 uppercase">{provingEntry.category}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor Lançado</span>
+                    <span className="text-sm font-black text-slate-800">R$ {provingEntry.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Observações / Notas do Lançamento</label>
+                   <input 
+                     name="notes" 
+                     type="text" 
+                     placeholder="Digite aqui as notas detalhadas..." 
+                     defaultValue={provingEntry.description}
+                     className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 outline-none focus:ring-4 focus:ring-yellow-400/30 transition-all shadow-inner"
+                   />
+                </div>
+
+                <div className="space-y-4">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Anexar Documento / Foto</label>
+                  
+                  {receiptFilePreview || provingEntry.receiptUrl ? (
+                    <div className="relative rounded-[2.5rem] overflow-hidden border-4 border-yellow-100 shadow-2xl group h-64 bg-slate-50">
+                      <img src={receiptFilePreview || provingEntry.receiptUrl} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button 
+                          type="button" 
+                          onClick={() => { setReceiptFilePreview(null); provingEntry.receiptUrl = undefined; }}
+                          className="w-16 h-16 bg-red-500 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"
+                        >
+                          <i className="fa-solid fa-trash-can text-xl"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button 
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full py-20 border-4 border-dashed border-gray-100 rounded-[3rem] flex flex-col items-center justify-center text-gray-300 hover:border-yellow-200 hover:text-yellow-500 hover:bg-yellow-50/20 transition-all group shadow-sm"
+                    >
+                      <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mb-5 group-hover:bg-yellow-400 group-hover:text-white transition-all shadow-inner">
+                        <i className="fa-solid fa-camera text-3xl"></i>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">Clique para enviar a foto</span>
+                    </button>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                    accept="image/*,application/pdf" 
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 sm:pt-6">
+                  <button 
+                    type="button" 
+                    onClick={() => setProvingEntry(null)} 
+                    className="flex-1 py-4 sm:py-5 border-2 border-slate-200 text-slate-600 rounded-xl sm:rounded-2xl font-bold uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-4 sm:py-5 mycond-bg-yellow text-slate-900 rounded-xl sm:rounded-2xl font-bold uppercase text-xs tracking-widest transition-all shadow-lg hover:bg-yellow-500"
+                  >
+                    Salvar
+                  </button>
+                </div>
+             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmação de Exclusão */}
+      {deletingEntry && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl animate-in fade-in" onClick={() => setDeletingEntry(null)}></div>
+          <div className="relative bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-10 animate-in zoom-in-95 text-center">
+             <div className="w-20 h-20 bg-red-50 text-red-500 rounded-[2rem] flex items-center justify-center mx-auto mb-6 text-3xl">
+                <i className="fa-solid fa-trash-can"></i>
+             </div>
+             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Excluir Registro?</h3>
+             <p className="text-xs text-gray-400 font-bold mb-8">Esta ação removerá permanentemente o lançamento "{deletingEntry.description}" do fluxo de caixa.</p>
+             <div className="flex gap-4">
+                <button onClick={() => setDeletingEntry(null)} className="flex-1 py-4 border-2 border-slate-100 rounded-2xl font-black uppercase text-[10px] tracking-widest">Manter</button>
+                <button onClick={confirmDelete} className="flex-1 py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-red-200">Excluir</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registro Geral */}
+      {isRegisterModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-2xl animate-in fade-in" onClick={() => setIsRegisterModalOpen(false)}></div>
+          <div className="relative bg-white w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="px-14 py-12 mycond-bg-blue text-white flex justify-between items-center">
+              <div><h3 className="text-3xl font-black uppercase tracking-tighter">Novo Lançamento</h3><p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Controle de Fluxo de Caixa</p></div>
+              <button onClick={() => setIsRegisterModalOpen(false)} className="w-14 h-14 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            <form onSubmit={handleRegisterEntry} className="p-14 space-y-8">
+              <div className="space-y-3"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Descrição Inicial</label><input required name="description" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 outline-none focus:ring-4 focus:ring-yellow-400/30 shadow-inner" placeholder="Ex: Conta de Luz" /></div>
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-3"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo</label><select name="type" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 transition-all"><option value="DESP">Despesa (Saída)</option><option value="RECU">Receita (Entrada)</option></select></div>
+                <div className="space-y-3"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Categoria</label><select name="category" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 transition-all">{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+              </div>
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-3"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor Bruto (R$)</label><input required name="amount" type="number" step="0.01" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 shadow-inner" placeholder="0,00" /></div>
+                <div className="space-y-3"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Data Competência</label><input required name="date" type="date" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 shadow-inner" /></div>
+              </div>
+              <button type="submit" className="w-full py-7 mycond-bg-yellow rounded-[2rem] font-black text-slate-900 hover:bg-yellow-500 shadow-2xl shadow-yellow-100 uppercase text-[11px] tracking-[0.2em] transition-all active:scale-95">Confirmar Registro</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Financeiro;

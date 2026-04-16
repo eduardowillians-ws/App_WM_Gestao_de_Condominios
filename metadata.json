@@ -1,0 +1,8 @@
+{
+  "name": "WM - Gestão de condomínios",
+  "description": "Uma plataforma completa para gestão de condomínios, integrando moradores, síndicos e portaria com funcionalidades de reservas, encomendas, ocorrências e financeiro.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

@@ -1,0 +1,13 @@
+project_id = "App_WM_Gestao_de_Condominios"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
