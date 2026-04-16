@@ -283,3 +283,21 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 - ✅ Taxa de Ocorrências: pendentes reais
 - ✅ Crescimento de Áreas: reservas do mês atual
 - ✅ Eficiência Logística: encomendas pendentes +5 dias
+
+### v2.5 - Controle de Acesso e Convite de Usuários:
+- ✅ Restrição do Dashboard (Início): apenas admin e manager
+- ✅ Restrição do Manual do Síndico: apenas admin e manager
+- ✅ Menu "Convidar Usuários": apenas admin visible
+- ✅ Formulário de convite: email, nome, unidade, cargo (manager/resident)
+- ✅ Edge Function `invite_user` para criar novos usuários
+- ⚠️ Deploy manual necessário no Supabase Edge Functions
+
+---
+
+## 📝 Status Atual
+- Dashboard com dados reais ✅
+- Filtros de mês/ano funcionando ✅
+- Registro de acessos implementado ✅
+- KPIs com dados reais ✅
+- Controle de acesso (admin/manager/resident) ✅
+- Convite de usuários (Edge Function) ⚠️ 需要 deploy manual
