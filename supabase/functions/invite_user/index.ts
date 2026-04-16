@@ -7,24 +7,29 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('Invite function called');
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+    console.log('URL:', supabaseUrl ? 'OK' : 'MISSING');
+    console.log('Anon Key:', supabaseAnonKey ? 'OK' : 'MISSING');
+    console.log('Service Key:', supabaseServiceKey ? 'OK' : 'MISSING');
+
     // Criar cliente com a chave pública (anon) para validar token
-    const supabasePublic = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
+    const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
 
     // Criar cliente com service role para operações admin
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const { email, name, unit, role } = await req.json();
+    console.log('Request body:', { email, name, unit, role });
     
     // Validações
     if (!email || !role) {
@@ -50,6 +55,8 @@ serve(async (req) => {
 
     // Verifica se o usuário que está fazendo a request é admin
     const authHeader = req.headers.get('Authorization');
+    console.log('Auth header:', authHeader ? 'Present' : 'Missing');
+    
     if (!authHeader) {
       return new Response(JSON.stringify({ success: false, error: "Não autorizado - faça login" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -59,6 +66,8 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabasePublic.auth.getUser(token);
+    console.log('Auth error:', authError);
+    console.log('User:', user ? 'Found' : 'Not found');
     
     if (authError || !user) {
       return new Response(JSON.stringify({ success: false, error: "Token inválido ou expirado" }), {
@@ -74,6 +83,8 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
+    console.log('Profile:', profile);
+    
     if (profile?.role !== 'admin') {
       return new Response(JSON.stringify({ success: false, error: "Apenas administradores podem convidar novos usuários" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -82,9 +93,13 @@ serve(async (req) => {
     }
 
     // Convida o usuário usando admin client
+    console.log('Inviting user:', email);
     const { data: userData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: origin
     });
+
+    console.log('Invite error:', inviteError);
+    console.log('Invite data:', userData);
 
     if (inviteError) {
       return new Response(JSON.stringify({ success: false, error: inviteError.message }), {
@@ -101,6 +116,7 @@ serve(async (req) => {
     }
 
     const userId = userData.user.id;
+    console.log('User created with ID:', userId);
 
     // Atualiza o perfil com name, unit E role usando admin client
     const { error: profileError } = await supabaseAdmin
@@ -112,9 +128,7 @@ serve(async (req) => {
       })
       .eq('id', userId);
 
-    if (profileError) {
-      console.warn("Aviso: Convite enviado, mas falha ao atualizar o perfil:", profileError);
-    }
+    console.log('Profile update error:', profileError);
 
     const roleLabel = role === 'manager' ? 'Zelador/Gestor' : 'Morador';
 
@@ -127,6 +141,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error: any) {
+    console.log('Catch error:', error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
