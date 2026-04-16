@@ -218,10 +218,10 @@ const Dashboard: React.FC = () => {
         console.log('Encomendas:', { total: encomendasResult?.length || 0, pendentes5dias });
         setEncomendasData({ total: encomendasResult?.length || 0, pendentes5dias });
 
-        // Busca saldo financeiro (receitas - despesas)
+        // Busca saldo financeiro (receitas - despesas) - tabela correta é financial_entries
         try {
-          const { data: receitas } = await supabase.from('financial').select('amount').eq('type', 'receita');
-          const { data: despesas } = await supabase.from('financial').select('amount').eq('type', 'despesa');
+          const { data: receitas } = await supabase.from('financial_entries').select('amount').eq('type', 'receita');
+          const { data: despesas } = await supabase.from('financial_entries').select('amount').eq('type', 'despesa');
           
           const totalReceitas = receitas?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0;
           const totalDespesas = despesas?.reduce((sum, d) => sum + (d.amount || 0), 0) || 0;
