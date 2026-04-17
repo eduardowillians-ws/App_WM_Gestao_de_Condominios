@@ -69,43 +69,39 @@ serve(async (req) => {
 
     const validRoles = ['admin', 'manager', 'resident'];
     if (!validRoles.includes(role)) {
-      return new Response(JSON.stringify({ success: false, error: "Role inválida. Use manager ou resident" }), {
+      return new Response(JSON.stringify({ success: false, error: "Role inválida." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
     }
 
-    // Determina a URL de redirecionamento (onde o usuário cairá após aceitar o convite)
-    let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin');
+    // Gerar uma senha temporária aleatória
+    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2).toUpperCase() + "!";
     
-    // Fallback para produção se não houver origin ou se for localhost em ambiente de teste
-    if (!origin || origin.includes('localhost') || origin.includes('run.app')) {
-      // Priorizamos a URL da Vercel se for um convite real
-      // Se você tiver uma URL customizada, altere aqui ou use a env PUBLIC_APP_URL
-      if (!Deno.env.get('PUBLIC_APP_URL')) {
-        origin = 'https://app-wm-gestao-de-condominios.vercel.app';
+    // Determina a URL base para o link do WhatsApp
+    let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
+    if (origin.endsWith('/')) origin = origin.slice(0, -1);
+
+    console.log(`Criando usuário: ${email} com cargo ${role}`);
+
+    // Criar o usuário diretamente (Bypass no limite de convite por e-mail)
+    const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: name,
+        role: role,
+        unit: unit
       }
-    }
-
-    if (origin.endsWith('/')) {
-      origin = origin.slice(0, -1);
-    }
-
-    console.log('Invite Redirect URL:', origin);
-
-    const { data: userData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: origin
     });
 
-    if (inviteError) {
-      return new Response(JSON.stringify({ success: false, error: inviteError.message }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
-
-    if (!userData || !userData.user) {
-      return new Response(JSON.stringify({ success: false, error: "Usuário não foi criado. Provavelmente já existe!" }), {
+    if (createError) {
+      console.error("Erro ao criar usuário:", createError);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
@@ -113,13 +109,20 @@ serve(async (req) => {
 
     const userId = userData.user.id;
 
+    // Criar ou Atualizar perfil na tabela profiles
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
-      .update({ name: name || email, unit: unit || null, role: role })
-      .eq('id', userId);
+      .upsert({
+        id: userId,
+        email: email,
+        full_name: name || email,
+        role: role,
+        unit: unit || null,
+        updated_at: new Date().toISOString(),
+      });
 
     if (profileUpdateError) {
-      console.warn("Aviso: Convite enviado, mas falha ao atualizar o perfil:", profileUpdateError);
+      console.warn("Aviso: Usuário criado, mas falha no perfil:", profileUpdateError);
     }
 
     const roleLabels: Record<string, string> = {
@@ -131,8 +134,14 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `${roleLabel} convidado com sucesso!`,
-      user: userData.user
+      message: `Usuário criado com sucesso!`,
+      data: {
+        userId: userId,
+        tempPassword: tempPassword,
+        email: email,
+        loginLink: origin,
+        roleLabel: roleLabel
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
