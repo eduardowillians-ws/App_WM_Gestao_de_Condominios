@@ -147,6 +147,8 @@ const App: React.FC = () => {
         activeView={activeView} 
         onViewChange={setActiveView} 
         currentUser={currentUser} 
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
       
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">

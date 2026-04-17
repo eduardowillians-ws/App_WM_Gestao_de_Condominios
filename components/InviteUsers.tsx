@@ -9,7 +9,7 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [unit, setUnit] = useState('');
-  const [role, setRole] = useState<'manager' | 'resident'>('resident');
+  const [role, setRole] = useState<'admin' | 'manager' | 'resident'>('resident');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -115,11 +115,12 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
             </label>
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as 'manager' | 'resident')}
+              onChange={(e) => setRole(e.target.value as 'admin' | 'manager' | 'resident')}
               className="w-full bg-slate-50 border-none text-sm font-bold text-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-yellow-400"
             >
               <option value="resident">Morador</option>
               <option value="manager">Zelador / Gestor</option>
+              <option value="admin">Administrador</option>
             </select>
           </div>
         </div>

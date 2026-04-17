@@ -67,7 +67,7 @@ serve(async (req) => {
       });
     }
 
-    const validRoles = ['manager', 'resident'];
+    const validRoles = ['admin', 'manager', 'resident'];
     if (!validRoles.includes(role)) {
       return new Response(JSON.stringify({ success: false, error: "Role inválida. Use manager ou resident" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -75,10 +75,23 @@ serve(async (req) => {
       });
     }
 
-    let origin = req.headers.get('origin') || 'http://localhost:3000';
+    // Determina a URL de redirecionamento (onde o usuário cairá após aceitar o convite)
+    let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin');
+    
+    // Fallback para produção se não houver origin ou se for localhost em ambiente de teste
+    if (!origin || origin.includes('localhost') || origin.includes('run.app')) {
+      // Priorizamos a URL da Vercel se for um convite real
+      // Se você tiver uma URL customizada, altere aqui ou use a env PUBLIC_APP_URL
+      if (!Deno.env.get('PUBLIC_APP_URL')) {
+        origin = 'https://app-wm-gestao-de-condominios.vercel.app';
+      }
+    }
+
     if (origin.endsWith('/')) {
       origin = origin.slice(0, -1);
     }
+
+    console.log('Invite Redirect URL:', origin);
 
     const { data: userData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: origin
@@ -109,7 +122,12 @@ serve(async (req) => {
       console.warn("Aviso: Convite enviado, mas falha ao atualizar o perfil:", profileUpdateError);
     }
 
-    const roleLabel = role === 'manager' ? 'Zelador/Gestor' : 'Morador';
+    const roleLabels: Record<string, string> = {
+      admin: 'Administrador',
+      manager: 'Zelador/Gestor',
+      resident: 'Morador'
+    };
+    const roleLabel = roleLabels[role] || role;
 
     return new Response(JSON.stringify({
       success: true,
