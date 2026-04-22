@@ -12,53 +12,119 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-    const { email, name, unit } = await req.json();
-    let origin = req.headers.get('origin') || 'http://localhost:3000';
-    
-    // Tratamento para não colocar barra duas vezes
-    if (origin.endsWith('/')) {
-        origin = origin.slice(0, -1);
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ success: false, error: 'Token de autenticação ausente.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
     }
 
-    const { data: userData, error: inviteError } = await supabaseClient.auth.admin.inviteUserByEmail(email, {
-      redirectTo: origin
+    const token = authHeader.replace('Bearer ', '');
+    const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    if (inviteError) {
-        // Retornamos 200 mas com erro amigavel, pois 400 quebra o frontend
-        return new Response(JSON.stringify({ success: false, error: inviteError.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200, // IMPORTANTE: Devolvemos 200!
-        });
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ success: false, error: 'Usuário não autenticado.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
     }
 
-    if (!userData || !userData.user) {
-        return new Response(JSON.stringify({ success: false, error: "Usuário não foi criado. Provavelmente já existe!" }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-        });
+    const { data: profile, error: profileCheckError } = await supabaseAdmin
+      .from('profiles')
+      .select('unit, block_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileCheckError || !profile) {
+      return new Response(JSON.stringify({ success: false, error: 'Perfil não encontrado.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
+
+    const { email, name, phone } = await req.json();
+    const unit = profile.unit;
+    const block_id = profile.block_id;
+
+    if (!email || !name) {
+      return new Response(JSON.stringify({ success: false, error: "Email e nome são obrigatórios" }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
+    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2).toUpperCase() + "!";
+    let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
+    if (origin.endsWith('/')) origin = origin.slice(0, -1);
+
+    const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        name: name,
+        role: 'resident',
+        phone: phone,
+        unit: unit,
+        block_id: block_id
+      }
+    });
+
+    if (createError) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
 
     const userId = userData.user.id;
 
-    const { error: profileError } = await supabaseClient
+    const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
-      .update({ name, unit })
-      .eq('id', userId);
+      .upsert({
+        id: userId,
+        email: email,
+        name: name,
+        role: 'resident',
+        phone: phone || null,
+        unit: unit,
+        block_id: block_id,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      });
 
-    if (profileError) {
-      console.warn("Aviso: Convite enviado, mas falha ao atualizar o perfil:", profileError);
+    if (profileUpdateError) {
+      console.error("Erro ao atualizar perfil:", profileUpdateError);
     }
 
-    return new Response(JSON.stringify({ success: true, user: userData.user }), {
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        userId: userId,
+        tempPassword: tempPassword,
+        email: email,
+        phone: phone,
+        loginLink: origin,
+        name: name,
+        unit: unit
+      }
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
+
   } catch (error: any) {
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
