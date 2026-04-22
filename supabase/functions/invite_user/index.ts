@@ -79,7 +79,7 @@ serve(async (req) => {
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
-      email_confirm: true,
+      email_confirm: false,
       user_metadata: {
         name: name,
         role: role,
@@ -90,6 +90,21 @@ serve(async (req) => {
 
     if (createError) {
       console.error("Erro no auth.admin.createUser (admin):", createError);
+      
+      const isRateLimit = createError.message.includes('rate limit') || 
+                         createError.message.includes('429') ||
+                         createError.status === 429;
+      
+      if (isRateLimit) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Limite de e-mails atingido. Tente novamente.' 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429,
+        });
+      }
+      
       return new Response(JSON.stringify({ 
         success: false, 
         error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
@@ -98,6 +113,11 @@ serve(async (req) => {
         status: 200,
       });
     }
+
+    // Marcar email como confirmado para evitar "waiting for verification"
+    await supabaseAdmin.auth.admin.updateUserById(userData.user.id, {
+      email_confirm: true
+    });
 
     const userId = userData.user.id;
     console.log(`Usuário administrativo criado com sucesso ID: ${userId}`);

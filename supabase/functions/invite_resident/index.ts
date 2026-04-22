@@ -77,10 +77,12 @@ serve(async (req) => {
 
     console.log(`Iniciando criação de usuário familiar: ${email} para o morador ${user.id}`);
 
+    // Criar usuário sem disparar email de confirmação
+    // No plano gratuito, mesmo email_confirm pode Disparar emails, então vamos criar e marcar como confirmado
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
-      email_confirm: true,
+      email_confirm: false,
       user_metadata: {
         name: name,
         role: 'familiar',
@@ -92,6 +94,23 @@ serve(async (req) => {
 
     if (createError) {
       console.error("Erro no auth.admin.createUser:", createError);
+      
+      // Se for rate limit, informar usuário para usar WhatsApp
+      const isRateLimit = createError.message.includes('rate limit') || 
+                         createError.message.includes('429') ||
+                         createError.message.includes('email') ||
+                         createError.status === 429;
+      
+      if (isRateLimit) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Limite de e-mails do Supabase atingido. Tente novamente em alguns minutos ou use WhatsApp para compartilhar os dados.' 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429,
+        });
+      }
+      
       return new Response(JSON.stringify({ 
         success: false, 
         error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
@@ -100,6 +119,11 @@ serve(async (req) => {
         status: 200,
       });
     }
+
+    // IMPORTANTE: Após criar, marcar email como confirmado para evitar "waiting for verification"
+    await supabaseAdmin.auth.admin.updateUserById(userData.user.id, {
+      email_confirm: true
+    });
 
     const userId = userData.user.id;
     console.log(`Usuário Auth criado com sucesso ID: ${userId}. Agora vinculando ao morador ${user.id}...`);
