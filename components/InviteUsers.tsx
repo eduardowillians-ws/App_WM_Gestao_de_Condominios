@@ -228,7 +228,7 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">
-                  WhatsApp (Celular)
+                  WhatsApp (Celular) *
                 </label>
                 <input
                   type="text"
@@ -236,6 +236,7 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-slate-50 border-none text-sm font-black text-slate-800 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-yellow-400 shadow-inner"
                   placeholder="Ex: 11999998888"
+                  required
                 />
               </div>
               

@@ -75,6 +75,8 @@ serve(async (req) => {
     let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
     if (origin.endsWith('/')) origin = origin.slice(0, -1);
 
+    console.log(`Iniciando criação de usuário familiar: ${email}`);
+
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
@@ -89,6 +91,7 @@ serve(async (req) => {
     });
 
     if (createError) {
+      console.error("Erro no auth.admin.createUser:", createError);
       return new Response(JSON.stringify({ 
         success: false, 
         error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
@@ -99,30 +102,31 @@ serve(async (req) => {
     }
 
     const userId = userData.user.id;
+    console.log(`Usuário Auth criado com sucesso ID: ${userId}`);
 
+    // Atualizar perfil na tabela profiles
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: userId,
         email: email,
-        name: name,
+        name: name || email,
         role: 'familiar',
         phone: phone || null,
         unit: unit,
         block_id: block_id,
         status: 'active',
-        parent_id: user.id,
         can_invite: false,
         updated_at: new Date().toISOString(),
       });
 
     if (profileUpdateError) {
-      console.error("Erro ao atualizar perfil:", profileUpdateError);
+      console.error("Erro ao atualizar perfil na tabela profiles:", profileUpdateError);
     }
 
     // Salvar convite na tabela invites para rastreamento
     try {
-      await supabaseAdmin
+      const { error: inviteRecordError } = await supabaseAdmin
         .from('invites')
         .upsert({
           id: userId,
@@ -136,10 +140,13 @@ serve(async (req) => {
           temp_password: tempPassword,
           status: 'pending',
           created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         }, { onConflict: 'email' });
+
+      if (inviteRecordError) {
+         console.warn("Aviso: Convite não salvo na tabela invites:", inviteRecordError.message);
+      }
     } catch (inviteErr) {
-      console.warn("Aviso: Tabela invites não existe ou erro ao salvar:", inviteErr);
+       console.warn("Aviso: Tabela invites não encontrada ou inacessível:", inviteErr);
     }
 
     return new Response(JSON.stringify({
@@ -150,8 +157,7 @@ serve(async (req) => {
         email: email,
         phone: phone,
         loginLink: origin,
-        name: name,
-        unit: unit
+        roleLabel: 'Familiar/Dependente'
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -159,9 +165,10 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
+    console.error("Erro global na função invite_resident:", error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: 500,
     });
   }
 });

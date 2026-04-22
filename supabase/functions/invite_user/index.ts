@@ -6,6 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function getRoleLabel(role: string): string {
+  const labels: Record<string, string> = {
+    admin: 'Administrador',
+    manager: 'Zelador/Gestor',
+    resident: 'Morador',
+    familiar: 'Familiar/Dependente'
+  };
+  return labels[role] || role;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -64,6 +74,8 @@ serve(async (req) => {
     let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
     if (origin.endsWith('/')) origin = origin.slice(0, -1);
 
+    console.log(`Iniciando criação administrativa de usuário: ${email} (${role})`);
+
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
@@ -71,13 +83,13 @@ serve(async (req) => {
       user_metadata: {
         name: name,
         role: role,
-        phone: phone,
-        unit: unit,
-        block_id: block_id
+        phone: phone || '',
+        unit: unit || '',
       }
     });
 
     if (createError) {
+      console.error("Erro no auth.admin.createUser (admin):", createError);
       return new Response(JSON.stringify({ 
         success: false, 
         error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
@@ -88,60 +100,49 @@ serve(async (req) => {
     }
 
     const userId = userData.user.id;
+    console.log(`Usuário administrativo criado com sucesso ID: ${userId}`);
 
-    // Atualizar perfil na tabela profiles (Garantindo nomes de colunas corretos: 'name' e 'phone')
-    const canInvite = role === 'admin' || role === 'manager' || role === 'resident';
+    // Atualizar perfil
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: userId,
         email: email,
-        name: name || email,
+        name: name,
         role: role,
         phone: phone || null,
         unit: unit || null,
-        block_id: block_id || null,
         status: 'active',
-        can_invite: canInvite,
         updated_at: new Date().toISOString(),
       });
 
     if (profileUpdateError) {
-      console.error("Erro ao atualizar perfil:", profileUpdateError);
+      console.error("Erro ao atualizar perfil (admin):", profileUpdateError);
     }
 
-    // Salvar convite na tabela invites para rastreamento (ignora erro se tabela não existir)
+    // Registrar convite na tabela invites
     try {
       const { error: inviteRecordError } = await supabaseAdmin
         .from('invites')
         .upsert({
           id: userId,
           email: email,
-          name: name || email,
+          name: name,
           phone: phone || null,
           unit: unit || null,
-          block_id: block_id || null,
           role: role,
-          invited_by: user.id,
+          invited_by: user.id || 'admin',
           temp_password: tempPassword,
           status: 'pending',
           created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         }, { onConflict: 'email' });
 
       if (inviteRecordError) {
-        console.warn("Aviso: Convite não salvo na tabela (tabela pode não existir):", inviteRecordError.message);
+        console.warn("Aviso: Convite não registrado na tabela invites:", inviteRecordError.message);
       }
     } catch (inviteErr) {
-      console.warn("Aviso: Tabela invites não existe ainda:", inviteErr);
+       console.warn("Aviso: Falha ao acessar tabela invites:", inviteErr);
     }
-
-    const roleLabels: Record<string, string> = {
-      admin: 'Administrador',
-      manager: 'Zelador/Gestor',
-      resident: 'Morador',
-      familiar: 'Familiar/Dependente'
-    };
 
     return new Response(JSON.stringify({
       success: true,
@@ -151,7 +152,7 @@ serve(async (req) => {
         email: email,
         phone: phone,
         loginLink: origin,
-        roleLabel: roleLabels[role] || role
+        roleLabel: getRoleLabel(role)
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -159,6 +160,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
+    console.error("Erro global na função invite_user:", error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

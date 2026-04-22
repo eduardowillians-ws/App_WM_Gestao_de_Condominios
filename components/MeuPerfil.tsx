@@ -25,7 +25,7 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
   const [profession, setProfession] = useState('');
 
   // Dados para Convite Familiar
-const [famName, setFamName] = useState('');
+  const [famName, setFamName] = useState('');
   const [famEmail, setFamEmail] = useState('');
   const [famPhone, setFamPhone] = useState('');
   const [isInvitingFam, setIsInvitingFam] = useState(false);
@@ -57,13 +57,11 @@ const [famName, setFamName] = useState('');
     setIsLoading(true);
 
     try {
-      // 1. Se digitou senha nova, atualiza no Supabase Auth
       if (password.trim() !== '') {
         const { error: pwdError } = await supabase.auth.updateUser({ password });
         if (pwdError) throw new Error("Erro ao atualizar senha: " + pwdError.message);
       }
 
-      // 2. Atualiza dados na tabela Profiles
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -89,41 +87,49 @@ const [famName, setFamName] = useState('');
     }
   };
 
-const handleInviteDependent = async (e: React.FormEvent) => {
+  const handleInviteDependent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!famName || !famEmail) return alert("Preencha o nome e email do dependente.");
+    if (!famName || !famEmail || !famPhone) {
+      return alert("Preencha o nome, e-mail e WhatsApp do dependente.");
+    }
 
     setIsInvitingFam(true);
+    setLastCreatedDependent(null);
+    
     try {
       const { data, error } = await supabase.functions.invoke('invite_resident', {
-        body: { email: famEmail, name: famName, phone: famPhone, unit: currentUser.unit }
+        body: { 
+          email: famEmail, 
+          name: famName, 
+          phone: famPhone, 
+          unit: currentUser.unit 
+        }
       });
       
-      if (error) throw new Error(error.message || 'Erro ao comunicar com a Nuvem.');
+      if (error) throw new Error(error.message || 'Erro ao comunicar com a função.');
       if (data && data.success === false) throw new Error(data.error);
 
       const dependentData = data.data;
       setLastCreatedDependent(dependentData);
       
-      const cleanPhone = dependentData.phone?.replace(/\D/g, '') || '';
-      const msg = `*Bem-vindo ao Condomínio WM Gestão!*%0A%0ASeu acesso já está pronto!%0A%0A*Morador:* ${dependentData.email}%0A*Senha Temporária:* ${dependentData.tempPassword}%0A%0A*Acesse aqui:* ${dependentData.loginLink}%0A%0A_Altere sua senha após o primeiro acesso._`;
-      const waUrl = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${msg}` : `https://web.whatsapp.com/send?text=${msg}`;
-      window.open(waUrl, '_blank');
-      
+      // Limpa campos
       setFamName('');
       setFamEmail('');
       setFamPhone('');
+
+      alert('Acesso criado! Use o botão do WhatsApp para enviar os dados.');
     } catch (error: any) {
-       alert("Erro ao convidar: " + error.message);
+      console.error(error);
+      alert("Erro ao convidar: " + (error.message || 'Erro desconhecido. Verifique o limite de e-mail no Supabase.'));
     } finally {
-       setIsInvitingFam(false);
+      setIsInvitingFam(false);
     }
   };
 
   const handleShareWhatsAppDependent = () => {
     if (!lastCreatedDependent) return;
     const cleanPhone = lastCreatedDependent.phone?.replace(/\D/g, '') || '';
-    const msg = `*Bem-vindo ao Condomínio WM Gestão!*%0A%0ASeu acesso já está pronto!%0A%0A*Morador:* ${lastCreatedDependent.email}%0A*Senha Temporária:* ${lastCreatedDependent.tempPassword}%0A%0A*Acesse aqui:* ${lastCreatedDependent.loginLink}%0A%0A_Altere sua senha após o primeiro acesso._`;
+    const msg = `*Bem-vindo ao Condomínio WM Gestão!*%0A%0ASeu acesso já está pronto!%0A%0A*Morador:* ${lastCreatedDependent.email}%0A*Senha Temporária:* ${lastCreatedDependent.tempPassword}%0A%0A*Acesse aqui:* ${window.location.origin}%0A%0A_Altere sua senha após o primeiro acesso._`;
     const waUrl = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${msg}` : `https://web.whatsapp.com/send?text=${msg}`;
     window.open(waUrl, '_blank');
   };
@@ -170,7 +176,6 @@ const handleInviteDependent = async (e: React.FormEvent) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Bloco 1: Acesso */}
             <div className="space-y-6 bg-slate-50 p-8 rounded-[2rem] shadow-inner">
                <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center"><i className="fa-solid fa-lock text-yellow-400 mr-2"></i> Segurança de Acesso</h4>
                
@@ -179,14 +184,13 @@ const handleInviteDependent = async (e: React.FormEvent) => {
                  <input className="w-full bg-slate-200 border-none rounded-2xl px-6 py-4 font-black text-slate-500 shadow-inner cursor-not-allowed opacity-70" value="Email gerenciado no acesso" disabled />
                </div>
 
-<div className="space-y-2">
+                <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Definir Nova Senha</label>
                   <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-white border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-sm" />
                   <p className="text-[9px] font-bold text-gray-400 ml-2 mt-1">Preencha apenas se quiser criar/alterar sua senha.</p>
                 </div>
             </div>
 
-            {/* Bloco 2: Dados Pessoais */}
             <div className="space-y-6 bg-slate-50 p-8 rounded-[2rem] shadow-inner">
               <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center"><i className="fa-solid fa-address-card text-yellow-400 mr-2"></i> Informações Pessoais</h4>
               
@@ -231,91 +235,73 @@ const handleInviteDependent = async (e: React.FormEvent) => {
           </div>
         </form>
 
-{lastCreatedDependent && (
-            <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-[2rem] mt-8">
-               <div className="flex items-center gap-3 mb-4 text-emerald-700">
-                  <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                     <i className="fa-solid fa-check text-xl"></i>
-                  </div>
-                  <div>
-                     <h5 className="font-black uppercase">Acesso Gerado!</h5>
-                     <p className="text-xs uppercase font-black opacity-60">Envie os dados via WhatsApp</p>
-                  </div>
-               </div>
-               <div className="space-y-3 mb-6 bg-white/50 p-4 rounded-xl">
-                  <div>
-                     <span className="text-[9px] text-gray-500 uppercase block font-black">E-mail</span>
-                     <span className="font-bold text-sm">{lastCreatedDependent.email}</span>
-                  </div>
-                  <div className="border-2 border-dashed border-emerald-200 p-3 rounded-xl">
-                     <span className="text-[9px] text-gray-500 uppercase block font-black">Senha Temporária</span>
-                     <span className="text-xl font-mono font-black">{lastCreatedDependent.tempPassword}</span>
-                  </div>
-               </div>
-               <div className="flex gap-3">
-                  <button onClick={handleShareWhatsAppDependent} className="flex-1 bg-[#25D366] text-white py-4 rounded-2xl font-black uppercase flex items-center justify-center gap-2 shadow-lg">
-                     <i className="fa-brands fa-whatsapp text-xl"></i> Abrir WhatsApp
-                  </button>
-                  <button onClick={resetDependentForm} className="px-6 bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold uppercase text-xs">
-                     Novo
-                  </button>
-               </div>
+        {(currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.role === 'resident' || currentUser.can_invite) && (
+          <div className="bg-yellow-50 p-8 rounded-[2rem] border border-yellow-100 mt-12 shadow-inner">
+            <div className="flex items-start space-x-4 mb-6">
+                <div className="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center text-slate-800 shadow-lg shadow-yellow-200/50">
+                    <i className="fa-solid fa-users text-xl"></i>
+                </div>
+                <div>
+                    <h5 className="font-black text-xl text-yellow-900 uppercase tracking-tighter">Dependentes e Familiares</h5>
+                    <p className="text-xs text-yellow-700 font-medium max-w-lg mt-1">Conceda um acesso independente para membros que moram com você. Eles herdarão a mesma Unidade.</p>
+                </div>
             </div>
-)}
 
-          {(currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.role === 'resident' || currentUser.can_invite) && (
-          <>
-            {!lastCreatedDependent && (
-              <div className="bg-yellow-50 p-8 rounded-[2rem] border border-yellow-100 mt-8 shadow-inner">
-                <div className="flex items-start space-x-4 mb-6">
-                    <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-slate-800 shadow-md">
-                       <i className="fa-solid fa-users"></i>
+            {lastCreatedDependent ? (
+              <div className="bg-white p-8 rounded-3xl border border-yellow-100 animate-in zoom-in-95 space-y-6">
+                <div className="flex items-center gap-4 text-emerald-600">
+                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center shadow-inner">
+                        <i className="fa-solid fa-check text-2xl"></i>
                     </div>
                     <div>
-                       <h5 className="font-black text-lg text-yellow-900 uppercase tracking-tighter">Dependentes e Familiares</h5>
-                       <p className="text-xs text-yellow-700 font-medium max-w-lg mt-1">Conceda um acesso independente para membros que moram com você. Eles herdarão a mesma Unidade.</p>
+                        <h4 className="font-black text-lg uppercase tracking-tight">Acesso Criado!</h4>
+                        <p className="text-xs uppercase font-bold opacity-60">Envie agora os dados via WhatsApp</p>
                     </div>
                 </div>
 
-                <form onSubmit={handleInviteDependent} className="bg-white p-6 rounded-2xl shadow-sm border border-yellow-50 space-y-4">
-                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Familiar</label>
-                         <input value={famName} onChange={(e)=>setFamName(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Nome Completo" />
-                      </div>
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">E-mail</label>
-                         <input type="email" value={famEmail} onChange={(e)=>setFamEmail(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Email" />
-                      </div>
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label>
-                         <input type="tel" value={famPhone} onChange={(e)=>setFamPhone(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Celular (opcional)" />
-                      </div>
-                   </div>
-                   <button disabled={isInvitingFam} type="submit" className="w-full h-14 bg-yellow-400 text-slate-900 hover:bg-yellow-500 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all">
-                      {isInvitingFam ? 'Criando Acesso...' : 'Criar Acesso'}
-                   </button>
-                </form>
-              </div>
-            )}
-            {lastCreatedDependent && (
-              <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-[2rem] mt-8">
-                 <div className="flex items-center gap-3 mb-4 text-emerald-700">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                       <i className="fa-solid fa-check text-xl"></i>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-slate-50 p-5 rounded-2xl">
+                        <span className="text-[9px] text-gray-400 uppercase font-black block mb-1">E-mail de Login</span>
+                        <span className="text-sm font-bold text-slate-700">{lastCreatedDependent.email}</span>
                     </div>
-                    <div>
-                       <h5 className="font-black uppercase">Acesso Gerado!</h5>
-                       <p className="text-xs uppercase font-black opacity-60">Dados enviados via WhatsApp</p>
+                    <div className="bg-slate-50 p-5 rounded-2xl border-2 border-dashed border-emerald-200">
+                        <span className="text-[9px] text-gray-400 uppercase font-black block mb-1">Senha Temporária</span>
+                        <span className="text-xl font-mono font-black text-slate-800">{lastCreatedDependent.tempPassword}</span>
                     </div>
-                 </div>
-                 <button onClick={resetDependentForm} className="w-full bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold uppercase text-xs">
-                    Cadastrar Outro
-                 </button>
+                </div>
+
+                <div className="flex gap-4">
+                    <button onClick={handleShareWhatsAppDependent} className="flex-1 bg-[#25D366] hover:bg-[#128C7E] text-white h-16 rounded-2xl font-black uppercase flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 transition-all active:scale-95">
+                        <i className="fa-brands fa-whatsapp text-2xl"></i> ENVIAR POR WHATSAPP
+                    </button>
+                    <button onClick={resetDependentForm} className="px-8 bg-slate-100 hover:bg-slate-200 text-slate-600 h-16 rounded-2xl font-black uppercase text-xs tracking-widest transition-all">
+                        CADASTRAR OUTRO
+                    </button>
+                </div>
               </div>
+            ) : (
+              <form onSubmit={handleInviteDependent} className="bg-white p-8 rounded-3xl shadow-sm border border-yellow-50 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">Nome do Familiar *</label>
+                          <input value={famName} onChange={(e)=>setFamName(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Ex: Joselene..." />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">E-mail de Acesso *</label>
+                          <input type="email" value={famEmail} onChange={(e)=>setFamEmail(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Ex: joselene@email.com" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">WhatsApp (Obridatório) *</label>
+                          <input type="tel" value={famPhone} onChange={(e)=>setFamPhone(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Ex: 11999998888" />
+                      </div>
+                  </div>
+                  <button disabled={isInvitingFam} type="submit" className="w-full h-16 bg-yellow-400 text-slate-900 hover:bg-yellow-500 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-yellow-100 transition-all flex items-center justify-center gap-3 active:scale-95">
+                      {isInvitingFam ? <><i className="fa-solid fa-circle-notch animate-spin"></i> CRIANDO ACESSO...</> : <><i className="fa-solid fa-user-plus"></i> CRIAR ACESSO E GERAR LINK</>}
+                  </button>
+              </form>
             )}
-          </>
-          )}
+          </div>
+        )}
 
       </div>
     </div>
