@@ -108,26 +108,30 @@ serve(async (req) => {
       console.error("Erro ao atualizar perfil:", profileUpdateError);
     }
 
-    // Salvar convite na tabela invites para rastreamento
-    const { error: inviteRecordError } = await supabaseAdmin
-      .from('invites')
-      .upsert({
-        id: userId,
-        email: email,
-        name: name || email,
-        phone: phone || null,
-        unit: unit || null,
-        block_id: block_id || null,
-        role: role,
-        invited_by: user.id,
-        temp_password: tempPassword,
-        status: 'pending',
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }, { onConflict: 'email' });
+    // Salvar convite na tabela invites para rastreamento (ignora erro se tabela não existir)
+    try {
+      const { error: inviteRecordError } = await supabaseAdmin
+        .from('invites')
+        .upsert({
+          id: userId,
+          email: email,
+          name: name || email,
+          phone: phone || null,
+          unit: unit || null,
+          block_id: block_id || null,
+          role: role,
+          invited_by: user.id,
+          temp_password: tempPassword,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        }, { onConflict: 'email' });
 
-    if (inviteRecordError) {
-      console.error("Erro ao salvar convite:", inviteRecordError);
+      if (inviteRecordError) {
+        console.warn("Aviso: Convite não salvo na tabela (tabela pode não existir):", inviteRecordError.message);
+      }
+    } catch (inviteErr) {
+      console.warn("Aviso: Tabela invites não existe ainda:", inviteErr);
     }
 
     const roleLabels: Record<string, string> = {

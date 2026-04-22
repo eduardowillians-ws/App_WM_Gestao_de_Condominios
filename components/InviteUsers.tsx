@@ -67,12 +67,12 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
   const handleShareWhatsApp = () => {
     if (!lastCreatedUser) return;
 
-    const cleanPhone = lastCreatedUser.phone.replace(/\D/g, '');
+    const cleanPhone = lastCreatedUser.phone?.replace(/\D/g, '') || '';
     const message = `*Bem-vindo ao Condomínio WM Gestão!*%0A%0ASeu acesso já está pronto!%0A%0A*Cargo:* ${lastCreatedUser.roleLabel}%0A*E-mail:* ${lastCreatedUser.email}%0A*Senha Temporária:* ${lastCreatedUser.tempPassword}%0A%0A*Acesse por aqui:* ${lastCreatedUser.loginLink}%0A%0A_Recomendamos alterar sua senha após o primeiro acesso._`;
     
-    const waUrl = cleanPhone 
+    const waUrl = cleanPhone
       ? `https://wa.me/55${cleanPhone}?text=${message}`
-      : `https://wa.me/?text=${message}`;
+      : `https://web.whatsapp.com/send?text=${message}`;
 
     window.open(waUrl, '_blank');
   };
