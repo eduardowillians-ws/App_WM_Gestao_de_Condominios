@@ -75,7 +75,7 @@ serve(async (req) => {
     let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
     if (origin.endsWith('/')) origin = origin.slice(0, -1);
 
-    console.log(`Iniciando criação de usuário familiar: ${email}`);
+    console.log(`Iniciando criação de usuário familiar: ${email} para o morador ${user.id}`);
 
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -102,9 +102,9 @@ serve(async (req) => {
     }
 
     const userId = userData.user.id;
-    console.log(`Usuário Auth criado com sucesso ID: ${userId}`);
+    console.log(`Usuário Auth criado com sucesso ID: ${userId}. Agora vinculando ao morador ${user.id}...`);
 
-    // Atualizar perfil na tabela profiles
+    // Atualizar perfil na tabela profiles e vincular ao morador (parent_id)
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .upsert({
@@ -117,14 +117,18 @@ serve(async (req) => {
         block_id: block_id,
         status: 'active',
         can_invite: false,
+        parent_id: user.id, // VINCULO CRITICO
         updated_at: new Date().toISOString(),
       });
 
     if (profileUpdateError) {
-      console.error("Erro ao atualizar perfil na tabela profiles:", profileUpdateError);
+      console.error("Erro CRITICO ao atualizar perfil na tabela profiles:", profileUpdateError);
+    } else {
+      console.log("Perfil na tabela 'profiles' atualizado com sucesso como 'familiar'.");
     }
 
     // Salvar convite na tabela invites para rastreamento
+    let inviteSaved = false;
     try {
       const { error: inviteRecordError } = await supabaseAdmin
         .from('invites')
@@ -144,13 +148,17 @@ serve(async (req) => {
 
       if (inviteRecordError) {
          console.warn("Aviso: Convite não salvo na tabela invites:", inviteRecordError.message);
+      } else {
+         inviteSaved = true;
+         console.log("Convite registrado na tabela 'invites'.");
       }
     } catch (inviteErr) {
-       console.warn("Aviso: Tabela invites não encontrada ou inacessível:", inviteErr);
+       console.warn("Aviso: Falha ao acessar tabela invites:", inviteErr);
     }
 
     return new Response(JSON.stringify({
       success: true,
+      invite_recorded: inviteSaved,
       data: {
         userId: userId,
         tempPassword: tempPassword,
