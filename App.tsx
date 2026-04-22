@@ -65,7 +65,8 @@ const App: React.FC = () => {
           name: profile.name || 'Usuário',
           unit: profile.unit || '---',
           role: profile.role || 'resident',
-          avatar: profile.photo_url || `https://ui-avatars.com/api/?name=${profile.name}`
+          avatar: profile.photo_url || `https://ui-avatars.com/api/?name=${profile.name}`,
+          can_invite: profile.can_invite || false
         });
         setIsAuthenticated(true);
       } else {

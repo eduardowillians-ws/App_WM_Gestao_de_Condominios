@@ -88,6 +88,7 @@ export interface User {
   unit: string;
   role: 'admin' | 'resident' | 'manager';
   avatar?: string;
+  can_invite?: boolean;
 }
 
 export interface Resident {

@@ -8,7 +8,7 @@ interface MeuPerfilProps {
     unit: string;
     role: string;
     avatar: string;
-    can_invite?: boolean;
+    can_invite?: boolean | null;
   };
 }
 
