@@ -15,10 +15,8 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-    // Cliente com service role (para operações admin)
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // ── Validação manual do JWT do chamador ──
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ success: false, error: 'Token de autenticação ausente.' }), {
@@ -28,14 +26,11 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-
-    // Cria cliente com o token do usuário chamador para verificar identidade
     const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-
     if (userError || !user) {
       return new Response(JSON.stringify({ success: false, error: 'Usuário não autenticado.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -43,7 +38,6 @@ serve(async (req) => {
       });
     }
 
-    // Verifica se o chamador tem role 'admin' na tabela profiles
     const { data: profile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
       .select('role')
@@ -51,14 +45,13 @@ serve(async (req) => {
       .single();
 
     if (profileCheckError || !profile || profile.role !== 'admin') {
-      return new Response(JSON.stringify({ success: false, error: 'Acesso negado. Apenas administradores podem convidar usuários.' }), {
+      return new Response(JSON.stringify({ success: false, error: 'Acesso negado.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
       });
     }
-    // ── Fim da validação ──
 
-    const { email, name, unit, role } = await req.json();
+    const { email, name, phone, role, unit, block_id } = await req.json();
 
     if (!email || !role) {
       return new Response(JSON.stringify({ success: false, error: "Email e role são obrigatórios" }), {
@@ -67,37 +60,24 @@ serve(async (req) => {
       });
     }
 
-    const validRoles = ['admin', 'manager', 'resident'];
-    if (!validRoles.includes(role)) {
-      return new Response(JSON.stringify({ success: false, error: "Role inválida." }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
-    }
-
-    // Gerar uma senha temporária aleatória
     const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2).toUpperCase() + "!";
-    
-    // Determina a URL base para o link do WhatsApp
     let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
     if (origin.endsWith('/')) origin = origin.slice(0, -1);
 
-    console.log(`Criando usuário: ${email} com cargo ${role}`);
-
-    // Criar o usuário diretamente (Bypass no limite de convite por e-mail)
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
       email_confirm: true,
       user_metadata: {
-        full_name: name,
+        name: name,
         role: role,
-        unit: unit
+        phone: phone,
+        unit: unit,
+        block_id: block_id
       }
     });
 
     if (createError) {
-      console.error("Erro ao criar usuário:", createError);
       return new Response(JSON.stringify({ 
         success: false, 
         error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
@@ -109,20 +89,45 @@ serve(async (req) => {
 
     const userId = userData.user.id;
 
-    // Criar ou Atualizar perfil na tabela profiles
+    // Atualizar perfil na tabela profiles (Garantindo nomes de colunas corretos: 'name' e 'phone')
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: userId,
         email: email,
-        full_name: name || email,
+        name: name || email,
         role: role,
+        phone: phone || null,
         unit: unit || null,
+        block_id: block_id || null,
+        status: 'active',
         updated_at: new Date().toISOString(),
       });
 
     if (profileUpdateError) {
-      console.warn("Aviso: Usuário criado, mas falha no perfil:", profileUpdateError);
+      console.error("Erro ao atualizar perfil:", profileUpdateError);
+    }
+
+    // Salvar convite na tabela invites para rastreamento
+    const { error: inviteRecordError } = await supabaseAdmin
+      .from('invites')
+      .upsert({
+        id: userId,
+        email: email,
+        name: name || email,
+        phone: phone || null,
+        unit: unit || null,
+        block_id: block_id || null,
+        role: role,
+        invited_by: user.id,
+        temp_password: tempPassword,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }, { onConflict: 'email' });
+
+    if (inviteRecordError) {
+      console.error("Erro ao salvar convite:", inviteRecordError);
     }
 
     const roleLabels: Record<string, string> = {
@@ -130,17 +135,16 @@ serve(async (req) => {
       manager: 'Zelador/Gestor',
       resident: 'Morador'
     };
-    const roleLabel = roleLabels[role] || role;
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Usuário criado com sucesso!`,
       data: {
         userId: userId,
         tempPassword: tempPassword,
         email: email,
+        phone: phone,
         loginLink: origin,
-        roleLabel: roleLabel
+        roleLabel: roleLabels[role] || role
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
