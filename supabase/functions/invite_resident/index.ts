@@ -14,15 +14,12 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+    // Verificar autenticação
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ success: false, error: 'Token de autenticação ausente.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 401,
-      });
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ success: false, error: 'Token ausente.' }), { headers: corsHeaders, status: 401 });
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -32,240 +29,107 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ success: false, error: 'Usuário não autenticado.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 401,
-      });
+      return new Response(JSON.stringify({ success: false, error: 'Usuário não autenticado.' }), { headers: corsHeaders, status: 401 });
     }
 
-    const { data: profile, error: profileCheckError } = await supabaseAdmin
-      .from('profiles')
-      .select('unit, block_id, can_invite, role, parent_id')
-      .eq('id', user.id)
-      .single();
-
-    if (profileCheckError || !profile) {
-      return new Response(JSON.stringify({ success: false, error: 'Perfil não encontrado.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 403,
-      });
+    // Verificar se pode convidar
+    const { data: profile } = await supabaseAdmin.from('profiles').select('unit, block_id, role').eq('id', user.id).single();
+    if (!profile) {
+      return new Response(JSON.stringify({ success: false, error: 'Perfil não encontrado.' }), { headers: corsHeaders, status: 403 });
     }
 
-    const canInvite = profile.role === 'admin' || profile.role === 'manager' || profile.role === 'resident' || profile.can_invite === true;
-    
+    const canInvite = profile.role === 'admin' || profile.role === 'manager' || profile.role === 'resident';
     if (!canInvite) {
-      return new Response(JSON.stringify({ success: false, error: 'Você não tem permissão para criar familiares.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 403,
-      });
+      return new Response(JSON.stringify({ success: false, error: 'Sem permissão.' }), { headers: corsHeaders, status: 403 });
     }
 
+    // Receber dados
     const { email, name, phone } = await req.json();
-    const unit = profile.unit;
-    const block_id = profile.block_id;
-
     if (!email || !name) {
-      return new Response(JSON.stringify({ success: false, error: "Email e nome são obrigatórios" }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
+      return new Response(JSON.stringify({ success: false, error: 'Email e nome são obrigatórios.' }), { headers: corsHeaders, status: 400 });
     }
 
+    // Gerar senha temporária
     const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2).toUpperCase() + "!";
-    let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
-    if (origin.endsWith('/')) origin = origin.slice(0, -1);
+    const origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
 
-    console.log(`Iniciando criação de usuário familiar: ${email} para o morador ${user.id}`);
+    console.log(`Criando familiar: ${email} vinculado ao morador ${user.id}`);
 
-    // Criar usuário sem disparar email de confirmação
-    // No plano gratuito, mesmo email_confirm pode Disparar emails, então vamos criar e marcar como confirmado
+    // Criar usuário no Supabase Auth
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
       email_confirm: false,
-      user_metadata: {
-        name: name,
-        role: 'familiar',
-        phone: phone || '',
-        unit: unit,
-        block_id: block_id
-      }
+      user_metadata: { name, role: 'familiar', phone: phone || '', unit: profile.unit, block_id: profile.block_id }
     });
 
     if (createError) {
-      console.error("Erro no auth.admin.createUser:", createError);
-      
-      // Se for rate limit, informar usuário para usar WhatsApp
-      const isRateLimit = createError.message.includes('rate limit') || 
-                         createError.message.includes('429') ||
-                         createError.message.includes('email') ||
-                         createError.status === 429;
-      
-      if (isRateLimit) {
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: 'Limite de e-mails do Supabase atingido. Tente novamente em alguns minutos ou use WhatsApp para compartilhar os dados.' 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 429,
-        });
-      }
-      
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
+      console.error("Erro ao criar usuário:", createError);
+      return new Response(JSON.stringify({ success: false, error: createError.message }), { headers: corsHeaders, status: 200 });
     }
 
-    // IMPORTANTE: Após criar, marcar email como confirmado para evitar "waiting for verification"
-    await supabaseAdmin.auth.admin.updateUserById(userData.user.id, {
-      email_confirm: true
-    });
+    // Marcar email como confirmado
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(userData.user.id, { email_confirm: true });
+    } catch (e) {
+      console.warn("Aviso ao marcar email:", e);
+    }
 
     const userId = userData.user.id;
-    console.log(`Usuário Auth criado com sucesso ID: ${userId}. Agora vinculando ao morador ${user.id}...`);
+    const moradorId = user.id;
 
-    // Tentar INSERT primeiro (se já existir, o trigger do Supabase já criou)
-    // Vamos verificar se já existe e atualizar se necessário
-    const { data: existingProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    if (existingProfile && existingProfile.role !== 'familiar') {
-      // Trigger do Supabase criou, precisamos corrigir
-      const { error: profileUpdateError } = await supabaseAdmin
-        .from('profiles')
-        .update({
-          email: email,
-          name: name || email,
-          role: 'familiar',
-          phone: phone || null,
-          unit: unit,
-          block_id: block_id,
-          status: 'active',
-          can_invite: false,
-          parent_id: user.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
-      
-      if (profileUpdateError) {
-        console.error("Erro CRITICO ao atualizar perfil na tabela profiles:", profileUpdateError);
-      } else {
-        console.log("Perfil corrigido para 'familiar' com parent_id =", user.id);
-      }
-    } else if (!existingProfile) {
-      // Não existe, inserir manualmente
-      const { error: insertError } = await supabaseAdmin
-        .from('profiles')
-        .insert({
-          id: userId,
-          email: email,
-          name: name || email,
-          role: 'familiar',
-          phone: phone || null,
-          unit: unit,
-          block_id: block_id,
-          status: 'active',
-          can_invite: false,
-          parent_id: user.id,
-        });
-      
-      if (insertError) {
-        console.error("Erro ao inserir perfil:", insertError);
-      }
-    } else {
-      console.log("Perfil já existe com role correto.");
+    // SALVAR PERFIL com parent_id (vínculo)
+    const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
+      id: userId,
+      email,
+      name: name || email,
+      role: 'familiar',
+      phone: phone || null,
+      unit: profile.unit,
+      block_id: profile.block_id,
+      status: 'active',
+      can_invite: false,
+      parent_id: moradorId,
+    });
+
+    if (profileError) {
+      console.error("Erro ao salvar perfil:", profileError);
     }
 
-    // Salvar convite na tabela invites para rastreamento
-    let inviteSaved = false;
+    // SALVAR NA TABELA INVITES
     try {
-      // Primeiro verificar se já existe
-      const { data: existingInvite } = await supabaseAdmin
-        .from('invites')
-        .select('id')
-        .eq('email', email)
-        .single();
-      
-      if (existingInvite) {
-        // Atualizar existente
-        const { error: inviteUpdateError } = await supabaseAdmin
-          .from('invites')
-          .update({
-            name: name || email,
-            phone: phone || null,
-            unit: unit || null,
-            block_id: block_id || null,
-            role: 'familiar',
-            invited_by: user.id,
-            temp_password: tempPassword,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-          })
-          .eq('email', email);
-        
-        if (inviteUpdateError) {
-          console.warn("Aviso: Convite não atualizado na tabela invites:", inviteUpdateError.message);
-        } else {
-          inviteSaved = true;
-          console.log("Convite atualizado na tabela 'invites'.");
-        }
-      } else {
-        // Inserir novo
-        const { error: inviteInsertError } = await supabaseAdmin
-          .from('invites')
-          .insert({
-            id: userId,
-            email: email,
-            name: name || email,
-            phone: phone || null,
-            unit: unit || null,
-            block_id: block_id || null,
-            role: 'familiar',
-            invited_by: user.id,
-            temp_password: tempPassword,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-          });
-        
-        if (inviteInsertError) {
-          console.warn("Aviso: Convite não inserido na tabela invites:", inviteInsertError.message);
-        } else {
-          inviteSaved = true;
-          console.log("Convite inserido na tabela 'invites'.");
-        }
-      }
-    } catch (inviteErr) {
-       console.warn("Aviso: Falha ao acessar tabela invites:", inviteErr);
+      await supabaseAdmin.from('invites').upsert({
+        id: userId,
+        email,
+        name: name || email,
+        phone: phone || null,
+        unit: profile.unit,
+        block_id: profile.block_id,
+        role: 'familiar',
+        invited_by: moradorId,
+        temp_password: tempPassword,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      }, { onConflict: 'email' });
+    } catch (e) {
+      console.warn("Aviso ao salvar convite:", e);
     }
 
+    // Retornar dados para WhatsApp
     return new Response(JSON.stringify({
       success: true,
-      invite_recorded: inviteSaved,
       data: {
-        userId: userId,
-        tempPassword: tempPassword,
-        email: email,
-        phone: phone,
-        loginLink: origin,
+        userId,
+        tempPassword,
+        email,
+        phone,
+        loginLink: origin.replace(/\/$/, ''),
         roleLabel: 'Familiar/Dependente'
       }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error: any) {
-    console.error("Erro global na função invite_resident:", error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    console.error("Erro global:", error);
+    return new Response(JSON.stringify({ success: false, error: error.message }), { headers: corsHeaders, status: 500 });
   }
 });
