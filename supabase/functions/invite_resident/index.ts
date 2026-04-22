@@ -40,7 +40,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
-      .select('unit, block_id, can_invite, role')
+      .select('unit, block_id, can_invite, role, parent_id')
       .eq('id', user.id)
       .single();
 
@@ -51,8 +51,10 @@ serve(async (req) => {
       });
     }
 
-    if (!profile.can_invite && profile.role !== 'admin' && profile.role !== 'manager') {
-      return new Response(JSON.stringify({ success: false, error: 'Você não tem permissão para criar dependentes.' }), {
+    const canInvite = profile.role === 'admin' || profile.role === 'manager' || profile.can_invite === true;
+    
+    if (!canInvite) {
+      return new Response(JSON.stringify({ success: false, error: 'Você não tem permissão para criar familiares.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
       });
@@ -109,6 +111,8 @@ serve(async (req) => {
         unit: unit,
         block_id: block_id,
         status: 'active',
+        parent_id: user.id,
+        can_invite: true,
         updated_at: new Date().toISOString(),
       });
 
