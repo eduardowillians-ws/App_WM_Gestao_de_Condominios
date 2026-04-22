@@ -96,7 +96,6 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
 
     setIsInvitingFam(true);
     setInviteError(null);
-    setLastCreatedDependent(null);
     
     try {
       const { data, error } = await supabase.functions.invoke('invite_resident', {
@@ -109,16 +108,20 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
       });
       
       if (error) throw new Error(error.message || 'Erro de conexão.');
-      if (data && data.success === false) throw new Error(data.error);
-
-      // Limpa campos ANTES de setar o dependente para garantir renderização limpa
+      
+      // Verificar se a resposta indica sucesso
+      const responseData = data?.data || data;
+      if (!responseData || !responseData.tempPassword) {
+        throw new Error(data?.error || 'Resposta inválida do servidor.');
+      }
+      
+      // Limpar campos e setar dependente
+      setLastCreatedDependent(responseData);
       setFamName('');
       setFamEmail('');
       setFamPhone('');
-      
-      setLastCreatedDependent(data.data);
     } catch (error: any) {
-      console.error(error);
+      console.error('Erro ao criar familiar:', error);
       setInviteError(error.message || 'Erro desconhecido.');
     } finally {
       setIsInvitingFam(false);

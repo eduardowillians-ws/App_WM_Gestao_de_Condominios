@@ -104,53 +104,118 @@ serve(async (req) => {
     const userId = userData.user.id;
     console.log(`Usuário Auth criado com sucesso ID: ${userId}. Agora vinculando ao morador ${user.id}...`);
 
-    // Atualizar perfil na tabela profiles e vincular ao morador (parent_id)
-    const { error: profileUpdateError } = await supabaseAdmin
+    // Tentar INSERT primeiro (se já existir, o trigger do Supabase já criou)
+    // Vamos verificar se já existe e atualizar se necessário
+    const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
-      .upsert({
-        id: userId,
-        email: email,
-        name: name || email,
-        role: 'familiar',
-        phone: phone || null,
-        unit: unit,
-        block_id: block_id,
-        status: 'active',
-        can_invite: false,
-        parent_id: user.id, // VINCULO CRITICO
-        updated_at: new Date().toISOString(),
-      });
-
-    if (profileUpdateError) {
-      console.error("Erro CRITICO ao atualizar perfil na tabela profiles:", profileUpdateError);
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (existingProfile && existingProfile.role !== 'familiar') {
+      // Trigger do Supabase criou, precisamos corrigir
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          email: email,
+          name: name || email,
+          role: 'familiar',
+          phone: phone || null,
+          unit: unit,
+          block_id: block_id,
+          status: 'active',
+          can_invite: false,
+          parent_id: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+      
+      if (profileUpdateError) {
+        console.error("Erro CRITICO ao atualizar perfil na tabela profiles:", profileUpdateError);
+      } else {
+        console.log("Perfil corrigido para 'familiar' com parent_id =", user.id);
+      }
+    } else if (!existingProfile) {
+      // Não existe, inserir manualmente
+      const { error: insertError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: email,
+          name: name || email,
+          role: 'familiar',
+          phone: phone || null,
+          unit: unit,
+          block_id: block_id,
+          status: 'active',
+          can_invite: false,
+          parent_id: user.id,
+        });
+      
+      if (insertError) {
+        console.error("Erro ao inserir perfil:", insertError);
+      }
     } else {
-      console.log("Perfil na tabela 'profiles' atualizado com sucesso como 'familiar'.");
+      console.log("Perfil já existe com role correto.");
     }
 
     // Salvar convite na tabela invites para rastreamento
     let inviteSaved = false;
     try {
-      const { error: inviteRecordError } = await supabaseAdmin
+      // Primeiro verificar se já existe
+      const { data: existingInvite } = await supabaseAdmin
         .from('invites')
-        .upsert({
-          id: userId,
-          email: email,
-          name: name || email,
-          phone: phone || null,
-          unit: unit || null,
-          block_id: block_id || null,
-          role: 'familiar',
-          invited_by: user.id,
-          temp_password: tempPassword,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-        }, { onConflict: 'email' });
-
-      if (inviteRecordError) {
-         console.warn("Aviso: Convite não salvo na tabela invites:", inviteRecordError.message);
+        .select('id')
+        .eq('email', email)
+        .single();
+      
+      if (existingInvite) {
+        // Atualizar existente
+        const { error: inviteUpdateError } = await supabaseAdmin
+          .from('invites')
+          .update({
+            name: name || email,
+            phone: phone || null,
+            unit: unit || null,
+            block_id: block_id || null,
+            role: 'familiar',
+            invited_by: user.id,
+            temp_password: tempPassword,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+          })
+          .eq('email', email);
+        
+        if (inviteUpdateError) {
+          console.warn("Aviso: Convite não atualizado na tabela invites:", inviteUpdateError.message);
+        } else {
+          inviteSaved = true;
+          console.log("Convite atualizado na tabela 'invites'.");
+        }
       } else {
-         inviteSaved = true;
-         console.log("Convite registrado na tabela 'invites'.");
+        // Inserir novo
+        const { error: inviteInsertError } = await supabaseAdmin
+          .from('invites')
+          .insert({
+            id: userId,
+            email: email,
+            name: name || email,
+            phone: phone || null,
+            unit: unit || null,
+            block_id: block_id || null,
+            role: 'familiar',
+            invited_by: user.id,
+            temp_password: tempPassword,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+          });
+        
+        if (inviteInsertError) {
+          console.warn("Aviso: Convite não inserido na tabela invites:", inviteInsertError.message);
+        } else {
+          inviteSaved = true;
+          console.log("Convite inserido na tabela 'invites'.");
+        }
       }
     } catch (inviteErr) {
        console.warn("Aviso: Falha ao acessar tabela invites:", inviteErr);
