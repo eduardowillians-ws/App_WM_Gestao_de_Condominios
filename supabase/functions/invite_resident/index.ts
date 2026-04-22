@@ -78,9 +78,10 @@ serve(async (req) => {
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
+      email_confirm: true,
       user_metadata: {
         name: name,
-        role: 'resident',
+        role: 'familiar',
         phone: phone || '',
         unit: unit,
         block_id: block_id
@@ -117,6 +118,28 @@ serve(async (req) => {
 
     if (profileUpdateError) {
       console.error("Erro ao atualizar perfil:", profileUpdateError);
+    }
+
+    // Salvar convite na tabela invites para rastreamento
+    try {
+      await supabaseAdmin
+        .from('invites')
+        .upsert({
+          id: userId,
+          email: email,
+          name: name || email,
+          phone: phone || null,
+          unit: unit || null,
+          block_id: block_id || null,
+          role: 'familiar',
+          invited_by: user.id,
+          temp_password: tempPassword,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        }, { onConflict: 'email' });
+    } catch (inviteErr) {
+      console.warn("Aviso: Tabela invites não existe ou erro ao salvar:", inviteErr);
     }
 
     return new Response(JSON.stringify({

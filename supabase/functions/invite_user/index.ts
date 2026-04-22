@@ -90,7 +90,7 @@ serve(async (req) => {
     const userId = userData.user.id;
 
     // Atualizar perfil na tabela profiles (Garantindo nomes de colunas corretos: 'name' e 'phone')
-    const canInvite = role === 'admin' || role === 'manager';
+    const canInvite = role === 'admin' || role === 'manager' || role === 'resident';
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .upsert({
@@ -139,7 +139,8 @@ serve(async (req) => {
     const roleLabels: Record<string, string> = {
       admin: 'Administrador',
       manager: 'Zelador/Gestor',
-      resident: 'Morador'
+      resident: 'Morador',
+      familiar: 'Familiar/Dependente'
     };
 
     return new Response(JSON.stringify({
