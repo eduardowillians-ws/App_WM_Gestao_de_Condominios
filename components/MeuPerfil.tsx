@@ -263,7 +263,7 @@ const handleInviteDependent = async (e: React.FormEvent) => {
             </div>
 )}
 
-          {(currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.can_invite) && (
+          {(currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.role === 'resident' || currentUser.can_invite) && (
           <>
             {!lastCreatedDependent && (
               <div className="bg-yellow-50 p-8 rounded-[2rem] border border-yellow-100 mt-8 shadow-inner">

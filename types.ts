@@ -86,7 +86,7 @@ export interface User {
   id: string;
   name: string;
   unit: string;
-  role: 'admin' | 'resident' | 'manager';
+  role: 'admin' | 'resident' | 'manager' | 'familiar';
   avatar?: string;
   can_invite?: boolean;
 }

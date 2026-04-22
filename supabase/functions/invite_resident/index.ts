@@ -51,7 +51,7 @@ serve(async (req) => {
       });
     }
 
-    const canInvite = profile.role === 'admin' || profile.role === 'manager' || profile.can_invite === true;
+    const canInvite = profile.role === 'admin' || profile.role === 'manager' || profile.role === 'resident' || profile.can_invite === true;
     
     if (!canInvite) {
       return new Response(JSON.stringify({ success: false, error: 'Você não tem permissão para criar familiares.' }), {
@@ -78,11 +78,10 @@ serve(async (req) => {
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
-      email_confirm: true,
       user_metadata: {
         name: name,
         role: 'resident',
-        phone: phone,
+        phone: phone || '',
         unit: unit,
         block_id: block_id
       }
@@ -106,13 +105,13 @@ serve(async (req) => {
         id: userId,
         email: email,
         name: name,
-        role: 'resident',
+        role: 'familiar',
         phone: phone || null,
         unit: unit,
         block_id: block_id,
         status: 'active',
         parent_id: user.id,
-        can_invite: true,
+        can_invite: false,
         updated_at: new Date().toISOString(),
       });
 
