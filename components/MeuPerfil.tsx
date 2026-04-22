@@ -8,6 +8,7 @@ interface MeuPerfilProps {
     unit: string;
     role: string;
     avatar: string;
+    can_invite?: boolean;
   };
 }
 
@@ -101,7 +102,14 @@ const handleInviteDependent = async (e: React.FormEvent) => {
       if (error) throw new Error(error.message || 'Erro ao comunicar com a Nuvem.');
       if (data && data.success === false) throw new Error(data.error);
 
-      setLastCreatedDependent(data.data);
+      const dependentData = data.data;
+      setLastCreatedDependent(dependentData);
+      
+      const cleanPhone = dependentData.phone?.replace(/\D/g, '') || '';
+      const msg = `*Bem-vindo ao Condomínio WM Gestão!*%0A%0ASeu acesso já está pronto!%0A%0A*Morador:* ${dependentData.email}%0A*Senha Temporária:* ${dependentData.tempPassword}%0A%0A*Acesse aqui:* ${dependentData.loginLink}%0A%0A_Altere sua senha após o primeiro acesso._`;
+      const waUrl = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${msg}` : `https://web.whatsapp.com/send?text=${msg}`;
+      window.open(waUrl, '_blank');
+      
       setFamName('');
       setFamEmail('');
       setFamPhone('');
@@ -253,48 +261,65 @@ const handleInviteDependent = async (e: React.FormEvent) => {
                   </button>
                </div>
             </div>
-          )}
+)}
 
-          {!lastCreatedDependent && (
-          <div className="bg-yellow-50 p-8 rounded-[2rem] border border-yellow-100 mt-8 shadow-inner">
-            <div className="flex items-start space-x-4 mb-6">
-                <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-slate-800 shadow-md">
-                   <i className="fa-solid fa-users"></i>
+          {(currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.can_invite) && (
+          <>
+            {!lastCreatedDependent && (
+              <div className="bg-yellow-50 p-8 rounded-[2rem] border border-yellow-100 mt-8 shadow-inner">
+                <div className="flex items-start space-x-4 mb-6">
+                    <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-slate-800 shadow-md">
+                       <i className="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                       <h5 className="font-black text-lg text-yellow-900 uppercase tracking-tighter">Dependentes e Familiares</h5>
+                       <p className="text-xs text-yellow-700 font-medium max-w-lg mt-1">Conceda um acesso independente para membros que moram com você. Eles herdarão a mesma Unidade.</p>
+                    </div>
                 </div>
-                <div>
-                   <h5 className="font-black text-lg text-yellow-900 uppercase tracking-tighter">Dependentes e Familiares</h5>
-                   <p className="text-xs text-yellow-700 font-medium max-w-lg mt-1">Conceda um acesso independente para membros que moram com você. Eles herdarão a mesma Unidade.</p>
-                </div>
-            </div>
 
-            <form onSubmit={handleInviteDependent} className="bg-white p-6 rounded-2xl shadow-sm border border-yellow-50 space-y-4">
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Familiar</label>
-                     <input value={famName} onChange={(e)=>setFamName(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Nome Completo" />
-                  </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">E-mail</label>
-                     <input type="email" value={famEmail} onChange={(e)=>setFamEmail(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Email" />
-                  </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label>
-                     <input type="tel" value={famPhone} onChange={(e)=>setFamPhone(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Celular (opcional)" />
-                  </div>
-               </div>
-               <button disabled={isInvitingFam} type="submit" className="w-full h-14 bg-yellow-400 text-slate-900 hover:bg-yellow-500 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all">
-                  {isInvitingFam ? 'Criando Acesso...' : 'Criar Acesso'}
-               </button>
-            </form>
-         </div>
+                <form onSubmit={handleInviteDependent} className="bg-white p-6 rounded-2xl shadow-sm border border-yellow-50 space-y-4">
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Familiar</label>
+                         <input value={famName} onChange={(e)=>setFamName(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Nome Completo" />
+                      </div>
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">E-mail</label>
+                         <input type="email" value={famEmail} onChange={(e)=>setFamEmail(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Email" />
+                      </div>
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label>
+                         <input type="tel" value={famPhone} onChange={(e)=>setFamPhone(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner" placeholder="Celular (opcional)" />
+                      </div>
+                   </div>
+                   <button disabled={isInvitingFam} type="submit" className="w-full h-14 bg-yellow-400 text-slate-900 hover:bg-yellow-500 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all">
+                      {isInvitingFam ? 'Criando Acesso...' : 'Criar Acesso'}
+                   </button>
+                </form>
+              </div>
+            )}
+            {lastCreatedDependent && (
+              <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-[2rem] mt-8">
+                 <div className="flex items-center gap-3 mb-4 text-emerald-700">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                       <i className="fa-solid fa-check text-xl"></i>
+                    </div>
+                    <div>
+                       <h5 className="font-black uppercase">Acesso Gerado!</h5>
+                       <p className="text-xs uppercase font-black opacity-60">Dados enviados via WhatsApp</p>
+                    </div>
+                 </div>
+                 <button onClick={resetDependentForm} className="w-full bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold uppercase text-xs">
+                    Cadastrar Outro
+                 </button>
+              </div>
+            )}
+          </>
           )}
 
       </div>
     </div>
   );
 };
-
-
-
 
 export default MeuPerfil;

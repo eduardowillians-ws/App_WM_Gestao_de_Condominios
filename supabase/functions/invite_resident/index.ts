@@ -40,12 +40,19 @@ serve(async (req) => {
 
     const { data: profile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
-      .select('unit, block_id')
+      .select('unit, block_id, can_invite, role')
       .eq('id', user.id)
       .single();
 
     if (profileCheckError || !profile) {
       return new Response(JSON.stringify({ success: false, error: 'Perfil não encontrado.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
+
+    if (!profile.can_invite && profile.role !== 'admin' && profile.role !== 'manager') {
+      return new Response(JSON.stringify({ success: false, error: 'Você não tem permissão para criar dependentes.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
       });

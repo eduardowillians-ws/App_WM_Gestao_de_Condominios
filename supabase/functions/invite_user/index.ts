@@ -90,6 +90,7 @@ serve(async (req) => {
     const userId = userData.user.id;
 
     // Atualizar perfil na tabela profiles (Garantindo nomes de colunas corretos: 'name' e 'phone')
+    const canInvite = role === 'admin' || role === 'manager';
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .upsert({
@@ -101,6 +102,7 @@ serve(async (req) => {
         unit: unit || null,
         block_id: block_id || null,
         status: 'active',
+        can_invite: canInvite,
         updated_at: new Date().toISOString(),
       });
 
