@@ -69,7 +69,7 @@ const Ocorrencias: React.FC<OcorrenciasProps> = ({ userRole = 'resident', curren
     try {
       let query = supabase
         .from('occurrences')
-        .select('*, profiles:user_id(id, name, unit)')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (!isAdmin && currentUser) {
@@ -77,7 +77,8 @@ const Ocorrencias: React.FC<OcorrenciasProps> = ({ userRole = 'resident', curren
         if (currentUser.role === 'resident') {
           query = query.eq('unit', currentUser.unit);
         } else {
-          query = query.eq('user_id', currentUser.id);
+          // Usamos resident_id para filtrar o usuário ou a unidade diretamente
+          query = query.eq('resident_id', currentUser.id);
         }
       }
 
