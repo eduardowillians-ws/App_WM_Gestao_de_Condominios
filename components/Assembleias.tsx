@@ -105,31 +105,26 @@ const Assembleias: React.FC<AssembleiasProps> = ({ userRole = 'resident', curren
         return;
       }
 
-      // Fetch votes for each assembly and check if current user voted
-      const assembliesWithVotes = await Promise.all((data || []).map(async (a: any) => {
-        const { data: votes } = await supabase
-          .from('assembly_votes')
-          .select('vote')
-          .eq('assembly_id', a.id);
+      // Fetch ALL votes for the relevant assemblies in one go to be more efficient
+      const assemblyIds = (data || []).map((a: any) => a.id);
+      const { data: allVotes, error: votesError } = await supabase
+        .from('assembly_votes')
+        .select('assembly_id, vote, user_id')
+        .in('assembly_id', assemblyIds);
 
-        const votesCount = votes?.length || 0;
+      if (votesError) console.error('Erro ao buscar votos:', votesError);
+
+      const assembliesWithVotes = (data || []).map((a: any) => {
+        const votes = allVotes?.filter((v: any) => v.assembly_id === a.id) || [];
+        const votesCount = votes.length;
         
-        // Check if current user already voted
-        let userVoted = false;
-        if (currentUser) {
-          const { data: userVote } = await supabase
-            .from('assembly_votes')
-            .select('id')
-            .eq('assembly_id', a.id)
-            .eq('user_id', currentUser.id)
-            .single();
-          userVoted = !!userVote;
-        }
+        // Check if current user already voted using the loaded list
+        const userVoted = currentUser ? votes.some((v: any) => v.user_id === currentUser.id) : false;
 
-        const results = votes?.reduce((acc: any, v: any) => {
+        const results = votes.reduce((acc: any, v: any) => {
           acc[v.vote] = (acc[v.vote] || 0) + 1;
           return acc;
-        }, { aprovo: 0, rejeito: 0, abstencao: 0 }) || { aprovo: 0, rejeito: 0, abstencao: 0 };
+        }, { aprovo: 0, rejeito: 0, abstencao: 0 });
 
         return {
           id: a.id,
@@ -145,7 +140,7 @@ const Assembleias: React.FC<AssembleiasProps> = ({ userRole = 'resident', curren
           minutesUrl: a.minutes_url,
           userVoted
         };
-      }));
+      });
 
       setAssemblies(assembliesWithVotes);
       
