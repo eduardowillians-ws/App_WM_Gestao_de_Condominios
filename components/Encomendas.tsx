@@ -62,6 +62,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
   };
 
   useEffect(() => {
+    const fetchEncomendas = async () => {
       let query = supabase
         .from('encomendas')
         .select(`
@@ -75,6 +76,8 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
           profiles(id, name, unit, phone)
         `)
         .order('received_at', { ascending: false });
+
+      const isAdmin = userRole === 'admin';
 
       if (!isAdmin && currentUser) {
         if (currentUser.role === 'resident') {
