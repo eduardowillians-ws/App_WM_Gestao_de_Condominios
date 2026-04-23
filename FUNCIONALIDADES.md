@@ -318,6 +318,13 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 - ✅ **Correção Documentos Jurídicos**: Fix do ReferenceError que causava tela branca (bug de variável não definida).
 - ✅ **Filtros de Segurança**: Moradores e Familiares agora possuem rotas de dados 100% isoladas para garantir privacidade.
 
+### v2.9 - Correções de Roteamento e Visibilidade Global:
+- ✅ **Fix Global "White Screen"**: Resolvido erro de referência `isResident` no kernel do App (App.tsx), recuperando o acesso total à plataforma.
+- ✅ **Acesso a Documentos**: Liberada visualização de atas e regulamentos para Moradores e Familiares (sem permissão de alteração).
+- ✅ **Padronização de Variáveis**: Uniformização dos estados de usuário limitado em toda a hierarquia de componentes.
+
+---
+
 ---
 
 ## 📝 Status Atual
