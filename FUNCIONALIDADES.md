@@ -23,6 +23,7 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 - **Convites Seguros:** Síndico digita Nome, Email, Unidade.
 - **Listagem e Buscas:** Grade com filtros.
 - **Máscaras:** RG, CPF, Celular.
+- **Formatação Automática:** Nome do bloco/torre em Title Case (primeira letra de cada palavra maiúscula).
 
 ---
 
@@ -291,6 +292,10 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 - ✅ Formulário de convite: email, nome, unidade, cargo (manager/resident)
 - ✅ Edge Function `invite_user` para criar novos usuários
 - ⚠️ Deploy manual necessário no Supabase Edge Functions
+
+### v2.6 - Title Case em Blocos/Torres:
+- ✅ Formatação automática do nome do bloco/torre ao salvar
+- ✅ Primeira letra de cada palavra em maiúscula (Title Case)
 
 ---
 
