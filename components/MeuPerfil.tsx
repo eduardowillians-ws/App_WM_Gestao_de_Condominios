@@ -28,6 +28,7 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
   const [famName, setFamName] = useState('');
   const [famEmail, setFamEmail] = useState('');
   const [famPhone, setFamPhone] = useState('');
+  const [famKinship, setFamKinship] = useState('Outro');
   const [isInvitingFam, setIsInvitingFam] = useState(false);
   const [lastCreatedDependent, setLastCreatedDependent] = useState<any>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -103,6 +104,7 @@ const handleInviteDependent = async (e: React.FormEvent) => {
           email: famEmail, 
           name: famName, 
           phone: famPhone, 
+          kinship: famKinship,
           unit: currentUser.unit 
         }
       });
@@ -150,6 +152,7 @@ const handleInviteDependent = async (e: React.FormEvent) => {
     setFamName('');
     setFamEmail('');
     setFamPhone('');
+    setFamKinship('Outro');
   };
 
   return (
@@ -283,6 +286,20 @@ const handleInviteDependent = async (e: React.FormEvent) => {
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">WhatsApp *</label>
                           <input type="tel" value={famPhone} onChange={(e)=>setFamPhone(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400" placeholder="11999998888" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">Parentesco *</label>
+                          <select 
+                            value={famKinship} 
+                            onChange={(e)=>setFamKinship(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400 appearance-none cursor-pointer"
+                          >
+                            <option value="Cônjuge">Cônjuge</option>
+                            <option value="Filho(a)">Filho(a)</option>
+                            <option value="Pai/Mãe">Pai/Mãe</option>
+                            <option value="Irmão/Irmã">Irmão/Irmã</option>
+                            <option value="Outro">Outro</option>
+                          </select>
                       </div>
                   </div>
                   

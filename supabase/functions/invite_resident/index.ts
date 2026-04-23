@@ -46,7 +46,7 @@ serve(async (req) => {
     }
 
     // Receber dados do convidado
-    const { email, name, phone } = await req.json();
+    const { email, name, phone, kinship } = await req.json();
     if (!email || !name) {
       return new Response(JSON.stringify({ success: false, error: 'Email e nome são obrigatórios.' }), { headers: corsHeaders, status: 400 });
     }
@@ -55,7 +55,7 @@ serve(async (req) => {
     let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
     if (origin.endsWith('/')) origin = origin.slice(0, -1);
 
-    console.log(`Criando familiar: ${email} vinculado ao morador ${user.id}`);
+    console.log(`Criando familiar: ${email} (${kinship}) vinculado ao morador ${user.id}`);
 
     // Criar usuário no Supabase Auth
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -66,6 +66,7 @@ serve(async (req) => {
         name, 
         role: 'familiar', 
         phone: phone || '', 
+        kinship: kinship || 'Outro',
         unit: profile.unit, 
         block_id: profile.block_id 
       }
@@ -84,10 +85,12 @@ serve(async (req) => {
     // SALVAR PERFIL DO FAMILIAR
     const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
       id: userId,
-      email: email, // Agora garantido pela migration 033
+      email: email, 
       name: name,
       role: 'familiar',
       phone: phone || null,
+      kinship: kinship || 'Outro', // Agora garantido pela migration 034
+      parent_id: user.id, // Agora garantido pela migration 034
       unit: profile.unit,
       block_id: profile.block_id,
       status: 'active',
