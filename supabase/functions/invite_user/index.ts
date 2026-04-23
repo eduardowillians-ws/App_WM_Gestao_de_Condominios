@@ -17,6 +17,8 @@ function getRoleLabel(role: string): string {
 }
 
 serve(async (req) => {
+  console.log("--- INÍCIO DA FUNÇÃO INVITE_USER ---");
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -25,10 +27,19 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("ERRO: Variáveis de ambiente SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não encontradas.");
+      return new Response(JSON.stringify({ success: false, error: 'Erro de configuração no servidor.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
+    }
+
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader) {
+      console.error("ERRO: Header Authorization não encontrado na requisição.");
       return new Response(JSON.stringify({ success: false, error: 'Token de autenticação ausente.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401,
@@ -36,35 +47,57 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    
+    // Verificação robusta do usuário usando a chave de serviço para validar o token
+    console.log("Validando token do usuário...");
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    
     if (userError || !user) {
-      return new Response(JSON.stringify({ success: false, error: 'Usuário não autenticado.' }), {
+      console.error("ERRO de Autenticação Supabase:", userError?.message);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Usuário não autenticado ou sessão expirada.',
+        details: userError?.message 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401,
       });
     }
 
+    console.log(`Usuário autenticado: ${user.email} (ID: ${user.id})`);
+
+    // Verificar perfil do autor
     const { data: profile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (profileCheckError || !profile || profile.role !== 'admin') {
-      return new Response(JSON.stringify({ success: false, error: 'Acesso negado.' }), {
+    if (profileCheckError || !profile) {
+      console.error("ERRO: Perfil do autor não encontrado no banco de dados.", profileCheckError);
+      return new Response(JSON.stringify({ success: false, error: 'Seu perfil de usuário não foi encontrado.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
       });
     }
 
-    const { email, name, phone, role, unit, block_id } = await req.json();
+    console.log(`Papel do autor: ${profile.role}`);
+
+    // Permitir admin ou manager
+    if (profile.role !== 'admin' && profile.role !== 'manager') {
+      console.error(`ERRO: Usuário com papel ${profile.role} tentou realizar convite.`);
+      return new Response(JSON.stringify({ success: false, error: 'Acesso negado. Apenas administradores podem convidar.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
+
+    const body = await req.json();
+    const { email, name, phone, role, unit } = body;
+    console.log(`Dados recebidos para convite: Email=${email}, Role=${role}`);
 
     if (!email || !role) {
-      return new Response(JSON.stringify({ success: false, error: "Email e role são obrigatórios" }), {
+      return new Response(JSON.stringify({ success: false, error: "Email e papel são obrigatórios" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
@@ -74,12 +107,12 @@ serve(async (req) => {
     let origin = Deno.env.get('PUBLIC_APP_URL') || req.headers.get('origin') || 'https://app-wm-gestao-de-condominios.vercel.app';
     if (origin.endsWith('/')) origin = origin.slice(0, -1);
 
-    console.log(`Iniciando criação administrativa de usuário: ${email} (${role})`);
-
+    // Criar usuário no Auth
+    console.log(`Criando usuário auth para ${email}...`);
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
-      email_confirm: false,
+      email_confirm: true, // Confirmar direto para evitar problemas de redirect/verificação
       user_metadata: {
         name: name,
         role: role,
@@ -89,46 +122,29 @@ serve(async (req) => {
     });
 
     if (createError) {
-      console.error("Erro no auth.admin.createUser (admin):", createError);
+      console.error("ERRO ao criar usuário no Auth:", createError);
       
-      const isRateLimit = createError.message.includes('rate limit') || 
-                         createError.message.includes('429') ||
-                         createError.status === 429;
-      
-      if (isRateLimit) {
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: 'Limite de e-mails atingido. Tente novamente.' 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 429,
-        });
-      }
+      const isRateLimit = createError.status === 429 || createError.message.includes('rate limit');
       
       return new Response(JSON.stringify({ 
         success: false, 
-        error: createError.message.includes('already registered') ? "Este e-mail já está em uso!" : createError.message 
+        error: isRateLimit ? 'Limite de e-mails do Supabase atingido. Tente em breve.' : (createError.message.includes('already registered') ? "Este e-mail já possui cadastro!" : createError.message)
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
-    // Marcar email como confirmado para evitar "waiting for verification"
-    await supabaseAdmin.auth.admin.updateUserById(userData.user.id, {
-      email_confirm: true
-    });
-
     const userId = userData.user.id;
-    console.log(`Usuário administrativo criado com sucesso ID: ${userId}`);
+    console.log(`Usuário auth criado com sucesso: ${userId}`);
 
-    // Atualizar perfil
+    // Upsert no Perfil
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: userId,
         email: email,
-        name: name,
+        name: name || email,
         role: role,
         phone: phone || null,
         unit: unit || null,
@@ -137,32 +153,34 @@ serve(async (req) => {
       });
 
     if (profileUpdateError) {
-      console.error("Erro ao atualizar perfil (admin):", profileUpdateError);
+      console.error("ERRO ao atualizar tabela profiles:", profileUpdateError);
     }
 
-    // Registrar convite na tabela invites
+    // Registrar na tabela de convites
     try {
       const { error: inviteRecordError } = await supabaseAdmin
         .from('invites')
         .upsert({
           id: userId,
           email: email,
-          name: name,
+          name: name || email,
           phone: phone || null,
           unit: unit || null,
           role: role,
-          invited_by: user.id || 'admin',
+          invited_by: user.id,
           temp_password: tempPassword,
           status: 'pending',
           created_at: new Date().toISOString(),
         }, { onConflict: 'email' });
 
       if (inviteRecordError) {
-        console.warn("Aviso: Convite não registrado na tabela invites:", inviteRecordError.message);
+        console.warn("AVISO: Falha ao registrar na tabela invites:", inviteRecordError.message);
       }
     } catch (inviteErr) {
-       console.warn("Aviso: Falha ao acessar tabela invites:", inviteErr);
+       console.warn("AVISO: Tabela invites não acessível ou erro de schema:", inviteErr);
     }
+
+    console.log("--- FINALIZAÇÃO BEM SUCEDIDA DA FUNÇÃO ---");
 
     return new Response(JSON.stringify({
       success: true,
@@ -180,8 +198,8 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error("Erro global na função invite_user:", error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
+    console.error("ERRO CRÍTICO GLOBAL:", error);
+    return new Response(JSON.stringify({ success: false, error: 'Erro interno no servidor de convites.', details: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });

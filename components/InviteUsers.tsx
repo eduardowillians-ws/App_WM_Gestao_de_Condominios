@@ -82,14 +82,27 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
     setLastCreatedUser(null);
 
     try {
+      console.log('Iniciando convite para:', email, 'com papel:', role);
       const { data, error } = await supabase.functions.invoke('invite_user', {
         body: { email, name, phone, role }
       });
 
       if (error) {
-        setMessage({ type: 'error', text: error.message || 'Erro de conexão' });
+        console.error('Erro retornado pelo invoke do Supabase:', error);
+        
+        // Verificar se é erro de autenticação (401)
+        const isAuthError = error.message?.includes('401') || (error as any).status === 401;
+        
+        setMessage({ 
+          type: 'error', 
+          text: isAuthError 
+            ? 'Sessão expirada ou sem permissão. Por favor, faça login novamente.' 
+            : `Erro na Função: ${error.message || 'Erro de conexão'}` 
+        });
         return;
       }
+
+      console.log('Resposta da função invite_user:', data);
 
       if (!data?.success) {
         setMessage({ type: 'error', text: data?.error || 'Erro ao criar usuário' });
