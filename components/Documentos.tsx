@@ -19,6 +19,7 @@ const Documentos: React.FC<DocumentosProps> = ({ userRole = 'resident', currentU
   const [searchTerm, setSearchTerm] = useState('');
   
   const isAdmin = userRole === 'admin' || userRole === 'manager';
+  const isResident = userRole === 'resident' || userRole === 'familiar';
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [viewingDoc, setViewingDoc] = useState<JuridicalDocument | null>(null);
   

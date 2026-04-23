@@ -312,11 +312,19 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 
 ---
 
+### v2.8 - Estabilidade de API e Correções de Interface:
+- ✅ **Resolução de Erros PGRST201/200**: Remoção de joins redundantes em Ocorrências, Reservas e Correspondência.
+- ✅ **Sincronização de Campos**: Ajuste das colunas de consulta para bater com o banco de dados (resident_name vs recipient_name).
+- ✅ **Correção Documentos Jurídicos**: Fix do ReferenceError que causava tela branca (bug de variável não definida).
+- ✅ **Filtros de Segurança**: Moradores e Familiares agora possuem rotas de dados 100% isoladas para garantir privacidade.
+
+---
+
 ## 📝 Status Atual
 - Dashboard com dados reais ✅
 - Filtros de mês/ano funcionando ✅
-- Registro de acessos implementado ✅
 - KPIs com dados reais ✅
 - Controle de acesso (admin/manager/resident/familiar) ✅
 - Onboarding via WhatsApp funcional ✅
 - Estabilidade de Queries (Fixed Join Errors) ✅
+- Bug Fix (ReferenceError in Documents) ✅
