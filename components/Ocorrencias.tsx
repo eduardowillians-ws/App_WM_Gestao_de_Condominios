@@ -12,7 +12,7 @@ interface ExtendedOcorrencia extends Ocorrencia {
 }
 
 interface OcorrenciasProps {
-  userRole?: 'admin' | 'resident' | 'manager';
+  userRole?: 'admin' | 'resident' | 'manager' | 'familiar';
   currentUser?: {
     id: string;
     name: string;
@@ -73,7 +73,12 @@ const Ocorrencias: React.FC<OcorrenciasProps> = ({ userRole = 'resident', curren
         .order('created_at', { ascending: false });
 
       if (!isAdmin && currentUser) {
-        query = query.eq('user_id', currentUser.id);
+        // Se for morador principal, vê tudo da unidade. Se for familiar, vê apenas as suas.
+        if (currentUser.role === 'resident') {
+          query = query.eq('unit', currentUser.unit);
+        } else {
+          query = query.eq('user_id', currentUser.id);
+        }
       }
 
       const { data, error } = await query;

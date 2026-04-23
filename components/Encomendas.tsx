@@ -4,7 +4,7 @@ import { Encomenda } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface EncomendasProps {
-  userRole?: 'admin' | 'resident' | 'manager';
+  userRole?: 'admin' | 'resident' | 'manager' | 'familiar';
   currentUser?: {
     id: string;
     name: string;
@@ -62,8 +62,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
   };
 
   useEffect(() => {
-    const fetchEncomendas = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('encomendas')
         .select(`
           id,
@@ -73,9 +72,21 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
           delivered_at,
           notified_at,
           tracking_code,
-          profiles(name, unit, phone)
+          profiles(id, name, unit, phone)
         `)
         .order('received_at', { ascending: false });
+
+      if (!isAdmin && currentUser) {
+        if (currentUser.role === 'resident') {
+          // Morador principal vê tudo da unidade (via filtros no join)
+          query = query.filter('profiles.unit', 'eq', currentUser.unit);
+        } else {
+          // Familiar vê apenas o que foi endereçado a ele
+          query = query.eq('profile_id', currentUser.id);
+        }
+      }
+
+      const { data, error } = await query;
       
       if (error) {
         console.error('Erro ao buscar encomendas:', error);

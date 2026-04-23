@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Assembleia } from '../types';
 
 interface AssembleiasProps {
-  userRole?: 'admin' | 'resident' | 'manager';
+  userRole?: 'admin' | 'resident' | 'manager' | 'familiar';
   currentUser?: {
     id: string;
     name: string;

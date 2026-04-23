@@ -5,7 +5,7 @@ import { AREAS_RESERVA } from '../constants';
 import { AreaReserva, Reserva } from '../types';
 
 interface ReservasProps {
-  userRole?: 'admin' | 'resident' | 'manager';
+  userRole?: 'admin' | 'resident' | 'manager' | 'familiar';
   currentUser?: {
     id: string;
     name: string;
@@ -85,7 +85,12 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
         .order('date', { ascending: true });
 
       if (!isAdmin && currentUser) {
-        query = query.eq('user_id', currentUser.id);
+        // Morador principal vê todas as reservas da unidade, Familiar vê apenas as dele.
+        if (currentUser.role === 'resident') {
+          query = query.eq('unit', currentUser.unit);
+        } else {
+          query = query.eq('user_id', currentUser.id);
+        }
       }
 
       const { data, error } = await query;
