@@ -82,7 +82,15 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
     setLastCreatedUser(null);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      
+      console.log('--- DIAGNÓSTICO DE CONVITE ---');
+      console.log('Usuário Logado:', currentUser.id, currentUser.role);
+      console.log('Token presente:', !!token);
+      if (token) console.log('Token (primeiros 20 caracteres):', token.substring(0, 20) + '...');
       console.log('Iniciando convite para:', email, 'com papel:', role);
+
       const { data, error } = await supabase.functions.invoke('invite_user', {
         body: { email, name, phone, role }
       });

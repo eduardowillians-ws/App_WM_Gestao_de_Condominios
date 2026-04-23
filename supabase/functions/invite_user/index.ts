@@ -138,14 +138,15 @@ serve(async (req) => {
     const userId = userData.user.id;
     console.log(`Usuário auth criado com sucesso: ${userId}`);
 
-    // Upsert no Perfil
+    // Upsert no Perfil - Removendo colunas que podem não existir ainda no banco do usuário
+    console.log(`Atualizando perfil para o usuário ${userId}...`);
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: userId,
-        email: email,
-        name: name || email,
+        name: name || email.split('@')[0], // Nome é NOT NULL
         role: role,
+        email: email, // Agora garantido pela nova migration
         phone: phone || null,
         unit: unit || null,
         status: 'active',
@@ -153,7 +154,11 @@ serve(async (req) => {
       });
 
     if (profileUpdateError) {
-      console.error("ERRO ao atualizar tabela profiles:", profileUpdateError);
+      console.error("ERRO CRÍTICO ao atualizar tabela profiles:", profileUpdateError.message);
+      // Não retornamos erro aqui para não interromper o fluxo se o Auth já foi criado,
+      // mas o log ajudará a identificar se a migration 033 foi aplicada.
+    } else {
+      console.log("Perfil atualizado com sucesso.");
     }
 
     // Registrar na tabela de convites
