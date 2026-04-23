@@ -73,6 +73,9 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'cashflow' | 'units'>('cashflow');
+  const [ledgerSearchTerm, setLedgerSearchTerm] = useState('');
+  const [ledgerStatusFilter, setLedgerStatusFilter] = useState('all');
+  const [ledgerMonthFilter, setLedgerMonthFilter] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
   const [residents, setResidents] = useState<any[]>([]);
   const [activeEntryMenu, setActiveEntryMenu] = useState<string | null>(null);
@@ -104,6 +107,16 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
       console.error('Error fetching residents:', err);
     }
   };
+
+  const filteredLedgerEntries = useMemo(() => {
+    return ledgerEntries.filter(l => {
+      const matchesSearch = (l.resident_name || '').toLowerCase().includes(ledgerSearchTerm.toLowerCase()) || 
+                          (l.unit || '').toLowerCase().includes(ledgerSearchTerm.toLowerCase());
+      const matchesStatus = ledgerStatusFilter === 'all' || l.status === ledgerStatusFilter;
+      const matchesMonth = !ledgerMonthFilter || (l.due_date && l.due_date.startsWith(ledgerMonthFilter));
+      return matchesSearch && matchesStatus && matchesMonth;
+    });
+  }, [ledgerEntries, ledgerSearchTerm, ledgerStatusFilter, ledgerMonthFilter]);
 
   const fetchLedger = async () => {
     try {
@@ -661,57 +674,93 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
         <div className="space-y-6 animate-in slide-in-from-bottom-8">
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total a Receber (Mês)</p>
-                <h3 className="text-2xl font-black text-slate-800">R$ {(ledgerEntries.reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total a Receber (Período)</p>
+                <h3 className="text-2xl font-black text-slate-800">R$ {(filteredLedgerEntries.reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
               </div>
               <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm font-black">
                 <p className="text-[10px] text-emerald-500 uppercase tracking-widest mb-1">Recebido</p>
-                <h3 className="text-2xl text-emerald-500">R$ {(ledgerEntries.filter(l => l.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+                <h3 className="text-2xl text-emerald-500">R$ {(filteredLedgerEntries.filter(l => l.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
               </div>
               <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm font-black">
                 <p className="text-[10px] text-red-500 uppercase tracking-widest mb-1">Pendente / Atrasado</p>
-                <h3 className="text-2xl text-red-500">R$ {(ledgerEntries.filter(l => l.status !== 'paid').reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+                <h3 className="text-2xl text-red-500">R$ {(filteredLedgerEntries.filter(l => l.status !== 'paid').reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
               </div>
            </div>
 
+           <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-wrap items-center gap-6">
+              <div className="flex-1 min-w-[200px] relative">
+                <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-gray-300"></i>
+                <input 
+                  type="text" 
+                  placeholder="Buscar morador ou unidade..." 
+                  value={ledgerSearchTerm}
+                  onChange={(e) => setLedgerSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-yellow-400 transition-all"
+                />
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                 {['all', 'pending', 'paid', 'overdue'].map(s => (
+                   <button 
+                     key={s} 
+                     onClick={() => setLedgerStatusFilter(s)}
+                     className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${ledgerStatusFilter === s ? 'bg-white shadow-sm text-slate-900' : 'text-gray-400'}`}
+                   >
+                     {s === 'all' ? 'Tudo' : s === 'pending' ? 'Pendente' : s === 'paid' ? 'Liquidado' : 'Atrasado'}
+                   </button>
+                 ))}
+              </div>
+              <input 
+                type="month" 
+                value={ledgerMonthFilter}
+                onChange={(e) => setLedgerMonthFilter(e.target.value)}
+                className="bg-slate-100 border-none rounded-xl px-4 py-2.5 text-[10px] font-black text-slate-700 outline-none focus:ring-2 focus:ring-yellow-400"
+              />
+            </div>
+
            <div className="bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-10 py-8 border-b border-gray-50 flex justify-between items-center bg-slate-50/50">
-                <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Histórico de Cobranças por Unidade</h4>
+                <div>
+                    <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Histórico de Cobranças por Unidade</h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">{filteredLedgerEntries.length} registros no período</p>
+                 </div>
                 <button 
                   onClick={() => setIsLedgerModalOpen(true)}
-                  className="mycond-bg-blue text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all"
+                  className="bg-black text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl"
                 >
-                  + NOVA COBRANÇA
+                  + Nova Cobrança
                 </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-100 font-black text-[10px] text-gray-400 uppercase tracking-widest">
-                      <th className="px-10 py-6">Morador / Unidade</th>
-                      <th className="px-6 py-6 font-center">Vencimento</th>
+                      <th className="px-10 py-6">Unidade</th>
+                      <th className="px-6 py-6">Morador</th>
+                      <th className="px-6 py-6 text-center">Vencimento</th>
                       <th className="px-6 py-6 text-right">Valor</th>
                       <th className="px-8 py-6 text-center">Status</th>
-                      <th className="px-6 py-6 text-right">Ação</th>
+                      <th className="px-10 py-6 text-right">Ação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {ledgerEntries.length === 0 ? (
+                    {filteredLedgerEntries.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-10 py-20 text-center text-gray-300">
+                        <td colSpan={6} className="px-10 py-20 text-center text-gray-300">
                           <i className="fa-solid fa-receipt text-5xl mb-4"></i>
-                          <p className="font-black uppercase text-xs">Nenhuma cobrança registrada ainda.</p>
+                          <p className="font-black uppercase text-xs">Nenhuma cobrança encontrada no período.</p>
                         </td>
                       </tr>
                     ) : (
-                      ledgerEntries.map(l => (
+                      filteredLedgerEntries.map(l => (
                         <tr key={l.id} className="hover:bg-slate-50 transition-all group">
                           <td className="px-10 py-6">
-                            <p className="text-xs font-black text-slate-800 uppercase">{l.resident_name}</p>
-                            <p className="text-[9px] text-gray-400 font-black uppercase">Unidade: {l.unit}</p>
+                            <span className="inline-flex items-center justify-center bg-slate-100 text-slate-700 w-12 h-8 rounded-lg text-[10px] font-black">{l.unit}</span>
                           </td>
                           <td className="px-6 py-6">
-                            <p className="text-xs font-black text-slate-600">{new Date(l.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                            <p className="text-xs font-black text-slate-800 uppercase">{l.resident_name}</p>
+                          </td>
+                          <td className="px-6 py-6 text-center">
+                            <p className="text-xs font-black text-slate-600">{l.due_date ? new Date(l.due_date + 'T12:00:00').toLocaleDateString('pt-BR') : '---'}</p>
                           </td>
                           <td className="px-6 py-6 text-right">
                             <span className="text-sm font-black text-slate-900">R$ {l.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
@@ -725,18 +774,18 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
                               {l.status === 'paid' ? 'Liquidado' : l.status === 'overdue' ? 'Atrasado' : 'Pendente'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right relative">
+                          <td className="px-10 py-4 text-right relative">
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setActiveEntryMenu(activeEntryMenu === l.id ? null : l.id);
                               }}
-                              className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center"
+                              className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all shadow-sm active:scale-95 inline-flex items-center justify-center"
                             >
                               <i className="fa-solid fa-ellipsis text-lg"></i>
                             </button>
                             {activeEntryMenu === l.id && (
-                              <div className="absolute right-0 top-12 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-[150] min-w-[140px] flex flex-col animate-in fade-in zoom-in-95">
+                              <div className="absolute right-10 top-12 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-[150] min-w-[140px] flex flex-col animate-in fade-in zoom-in-95">
                                 {l.status !== 'paid' && (
                                   <button 
                                     onClick={() => handleUpdateLedgerStatus(l.id, 'paid')}
