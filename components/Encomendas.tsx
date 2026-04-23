@@ -27,37 +27,27 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
   const fetchBlocks = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('unit, status, name')
-        .eq('role', 'resident')
-        .eq('status', 'active')
-        .not('name', 'is', null)
-        .not('name', 'eq', '');
+        .from('condo_blocks')
+        .select('*')
+        .order('name');
       
       if (error) throw error;
       
-      const unitsByBlock: Record<string, string[]> = {};
-      (data || []).forEach((p: any) => {
-        const unit = p.unit || '';
-        if (unit) {
-          const blockName = unit.replace(/[0-9]/g, '').trim() || 'Torre A';
-          if (!unitsByBlock[blockName]) unitsByBlock[blockName] = [];
-          if (!unitsByBlock[blockName].includes(unit)) {
-            unitsByBlock[blockName].push(unit);
-          }
-        }
-      });
-      
-      const blockList = Object.entries(unitsByBlock).map(([name, units]) => ({
-        id: name,
-        name,
-        units: units.sort()
-      })).sort((a, b) => a.name.localeCompare(b.name));
-      
-      setBlocks(blockList);
+      if (data && data.length > 0) {
+        setBlocks(data.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          units: b.units || []
+        })));
+      } else {
+        setBlocks([
+          { id: 'b1', name: 'Torre Alpha', units: ['101', '102', '103', '104', '201', '202', '203', '204', '304', '404', '504'] },
+          { id: 'b2', name: 'Torre Beta', units: ['11', '12', '21', '22', '31', '32', '41', '42', '51', '52'] }
+        ]);
+      }
     } catch (err) {
-      console.log('No blocks:', err);
-      setBlocks([{ id: 'Torre A', name: 'Torre A', units: ['101', '102', '201', '202', '301', '302'] }]);
+      console.log('Error fetching condo_blocks:', err);
+      setBlocks([{ id: 'Torre Alpha', name: 'Torre Alpha', units: ['101', '102', '404'] }]);
     }
   };
 
