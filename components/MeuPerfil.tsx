@@ -35,12 +35,39 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
 
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const applyCPFMask = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  const applyRGMask = (v: string) => v.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  const applyPhoneMask = (v: string) => v.replace(/\D/g, '').replace(/^(\d{2})(\d)/g, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2');
+  const applyCPFMask = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').substring(0, 14);
+  const applyRGMask = (v: string) => v.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').substring(0, 12);
+  const applyPhoneMask = (v: string) => {
+    const raw = v.replace(/\D/g, '').substring(0, 11);
+    if (raw.length <= 10) {
+      return raw.replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2');
+    }
+    return raw.replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2');
+  };
 
-  const capitalizeFirstLetter = (string: string) => {
-    return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+  React.useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
+      
+      if (data) {
+        setName(data.name || '');
+        setCpf(data.cpf ? applyCPFMask(data.cpf) : '');
+        setRg(data.rg ? applyRGMask(data.rg) : '');
+        setPhone(data.phone ? applyPhoneMask(data.phone) : '');
+        setProfession(data.profession || '');
+        if (data.photo_url) setPhoto(data.photo_url);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar perfil completo:", err);
+    }
   };
 
   const PROFESSIONS = ['Engenheiro(a)', 'Arquiteto(a)', 'Advogado(a)', 'Médico(a)', 'Autônomo(a)', 'Empresário(a)', 'Professor(a)', 'Designer', 'Desenvolvedor(a)', 'Aposentado(a)'];
@@ -68,9 +95,9 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
         .from('profiles')
         .update({
           name,
-          cpf,
-          rg,
-          phone,
+          cpf: cpf.replace(/\D/g, ''),
+          rg: rg.replace(/\D/g, ''),
+          phone: phone.replace(/\D/g, ''),
           profession,
           photo_url: photo !== currentUser.avatar ? photo : undefined,
         })
@@ -204,21 +231,23 @@ const handleInviteDependent = async (e: React.FormEvent) => {
 
             <div className="space-y-6 bg-slate-50 p-8 rounded-[2rem] shadow-inner">
               <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center"><i className="fa-solid fa-address-card text-yellow-400 mr-2"></i> Dados Pessoais</h4>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome Completo</label>
-                <input required value={name} onChange={(e)=>setName(e.target.value)} className="w-full bg-white border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Telefone</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">RG</label>
+                  <input value={rg} onChange={(e)=>setRg(applyRGMask(e.target.value))} placeholder="00.000.000-0" className="w-full bg-white border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-sm" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CPF</label>
+                  <input value={cpf} onChange={(e)=>setCpf(applyCPFMask(e.target.value))} placeholder="000.000.000-00" className="w-full bg-white border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-sm" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Telefone / WhatsApp</label>
                   <input required value={phone} onChange={(e)=>setPhone(applyPhoneMask(e.target.value))} placeholder="(11) 90000-0000" className="w-full bg-white border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-sm" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Profissão</label>
-                  <input list="prof-list" value={profession} onChange={(e)=>setProfession(capitalizeFirstLetter(e.target.value))} placeholder="Sua profisssão" className="w-full bg-white border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-sm" />
+                  <input list="prof-list" value={profession} onChange={(e)=>setProfession(e.target.value)} placeholder="Sua profisssão" className="w-full bg-white border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-sm" />
                   <datalist id="prof-list">{PROFESSIONS.map(p => <option key={p} value={p} />)}</datalist>
                 </div>
-              </div>
             </div>
           </div>
 
