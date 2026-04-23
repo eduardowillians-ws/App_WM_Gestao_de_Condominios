@@ -77,8 +77,8 @@ const Ocorrencias: React.FC<OcorrenciasProps> = ({ userRole = 'resident', curren
         if (currentUser.role === 'resident') {
           query = query.eq('unit', currentUser.unit);
         } else {
-          // Usamos resident_id para filtrar o usuário ou a unidade diretamente
-          query = query.eq('resident_id', currentUser.id);
+          // Usamos user_id para filtrar o usuário ou a unidade diretamente
+          query = query.eq('user_id', currentUser.id);
         }
       }
 

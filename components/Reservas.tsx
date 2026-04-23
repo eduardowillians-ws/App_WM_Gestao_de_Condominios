@@ -92,7 +92,7 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
         if (currentUser.role === 'resident') {
           query = query.eq('unit', currentUser.unit);
         } else {
-          query = query.eq('resident_id', currentUser.id);
+          query = query.eq('user_id', currentUser.id);
         }
       }
 
@@ -255,7 +255,7 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
         .from('reservations')
         .insert({
           area_id: selectedArea.id,
-          resident_id: currentUser.id,
+          user_id: currentUser.id,
           resident_name: currentUser.name,
           unit: currentUser.unit,
           date: formData.date,
