@@ -88,7 +88,7 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
     }
   };
 
-  const handleInviteDependent = async (e: React.FormEvent) => {
+const handleInviteDependent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!famName || !famEmail || !famPhone) {
       return setInviteError("Preencha nome, e-mail e WhatsApp.");
@@ -98,7 +98,7 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
     setInviteError(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('invite_resident', {
+      const response = await supabase.functions.invoke('invite_resident', {
         body: { 
           email: famEmail, 
           name: famName, 
@@ -107,16 +107,24 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
         }
       });
       
-      if (error) throw new Error(error.message || 'Erro de conexão.');
+      console.log("Resposta da função:", response);
       
-      // Verificar se a resposta indica sucesso
-      const responseData = data?.data || data;
-      if (!responseData || !responseData.tempPassword) {
-        throw new Error(data?.error || 'Resposta inválida do servidor.');
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro de conexão.');
       }
       
-      // Limpar campos e setar dependente
-      setLastCreatedDependent(responseData);
+      // A resposta vem em response.data ou diretamente em response
+      const result = response.data || response;
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao criar usuário.');
+      }
+      
+      if (!result.data?.tempPassword && !result.tempPassword) {
+        throw new Error('Resposta inválida do servidor.');
+      }
+      
+      setLastCreatedDependent(result.data || result);
       setFamName('');
       setFamEmail('');
       setFamPhone('');
