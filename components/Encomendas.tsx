@@ -67,14 +67,13 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
         .from('encomendas')
         .select(`
           id,
-          recipient_name,
-          unit,
           description,
           status,
           received_at,
           delivered_at,
           notified_at,
-          tracking_code
+          tracking_code,
+          profiles:profile_id(id, name, unit)
         `)
         .order('received_at', { ascending: false });
 
@@ -82,8 +81,8 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
 
       if (!isAdmin && currentUser) {
         if (currentUser.role === 'resident') {
-          // Morador principal vê tudo da unidade
-          query = query.eq('unit', currentUser.unit);
+          // Morador principal vê tudo da unidade (através do perfil vinculado)
+          query = query.filter('profiles.unit', 'eq', currentUser.unit);
         } else {
           // Familiar vê apenas o que foi endereçado a ele
           query = query.eq('profile_id', currentUser.id);
@@ -97,9 +96,9 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
       } else if (data) {
         const formatted = data.map((e: any) => ({
           id: e.id,
-          residentName: e.recipient_name || 'Desconhecido',
-          block: e.unit ? e.unit.replace(/[0-9]/g, '').trim() : '',
-          unit: e.unit || '',
+          residentName: e.profiles?.name || 'Desconhecido',
+          block: e.profiles?.unit ? e.profiles.unit.replace(/[0-9]/g, '').trim() : '',
+          unit: e.profiles?.unit || '',
           phone: '',
           description: e.description,
           trackingCode: e.tracking_code || '',
