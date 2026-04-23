@@ -79,6 +79,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
   const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
   const [residents, setResidents] = useState<any[]>([]);
   const [activeEntryMenu, setActiveEntryMenu] = useState<string | null>(null);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   
   // Estados para Modais de Ação
   const [viewingEntry, setViewingEntry] = useState<FinancialEntry | null>(null);
@@ -212,6 +213,51 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
     } finally {
       setIsLoading(false);
       setActiveEntryMenu(null);
+    }
+  };
+
+  const handleBatchBilling = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const amount = parseFloat(formData.get('amount') as string);
+      const dueDate = formData.get('due_date') as string;
+      const type = formData.get('type') as string;
+      const period = formData.get('period') as string; // Ex: 2026-04
+
+      // Filtra apenas moradores (ignora familiares) e que estejam ativos
+      const activeResidents = residents.filter(r => (r.role === 'resident' || r.role === 'manager'));
+
+      if (activeResidents.length === 0) {
+        throw new Error('Nenhum morador ativo encontrado para faturamento.');
+      }
+
+      const newEntries = activeResidents.map(r => ({
+        profile_id: r.id,
+        resident_name: r.name,
+        unit: r.unit,
+        amount: amount,
+        due_date: dueDate,
+        type: type,
+        status: 'pending',
+        notes: `Faturamento Mensal - Ref: ${period}`
+      }));
+
+      // Inserção em lote no Supabase
+      const { error } = await supabase
+        .from('resident_ledger')
+        .insert(newEntries);
+
+      if (error) throw error;
+
+      await fetchLedger();
+      setIsBatchModalOpen(false);
+      alert(`${newEntries.length} cobranças geradas com sucesso para o período ${period}!`);
+    } catch (err: any) {
+      alert('Erro no faturamento em lote: ' + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -723,12 +769,20 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
                     <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Histórico de Cobranças por Unidade</h4>
                     <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">{filteredLedgerEntries.length} registros no período</p>
                  </div>
-                <button 
-                  onClick={() => setIsLedgerModalOpen(true)}
-                  className="bg-black text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl"
-                >
-                  + Nova Cobrança
-                </button>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setIsBatchModalOpen(true)}
+                    className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all"
+                  >
+                    <i className="fa-solid fa-layer-group mr-2"></i>Gerar Lote Mensal
+                  </button>
+                  <button 
+                    onClick={() => setIsLedgerModalOpen(true)}
+                    className="bg-black text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl"
+                  >
+                    + Nova Cobrança
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -1064,6 +1118,56 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
               <div className="space-y-3"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Notas / Observações</label><textarea name="notes" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 outline-none shadow-inner h-24" placeholder="Ex: Referente a Janeiro/2025" /></div>
 
               <button type="submit" className="w-full py-7 mycond-bg-blue text-white rounded-[2rem] font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl shadow-blue-100 transition-all active:scale-95">Gerar Cobrança</button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Faturamento em Lote */}
+      {isBatchModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-2xl animate-in fade-in" onClick={() => setIsBatchModalOpen(false)}></div>
+          <div className="relative bg-white w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="px-14 py-12 bg-emerald-600 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-3xl font-black uppercase tracking-tighter">Faturamento em Lote</h3>
+                <p className="text-[10px] text-emerald-100 font-bold uppercase tracking-widest">Lançamento Massivo para Moradores</p>
+              </div>
+              <button onClick={() => setIsBatchModalOpen(false)} className="w-14 h-14 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            <form onSubmit={handleBatchBilling} className="p-14 space-y-8">
+              <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 mb-4">
+                <p className="text-[10px] font-bold text-emerald-700 uppercase">Atenção</p>
+                <p className="text-xs text-emerald-600 mt-1">Este processo gerará uma cobrança para todos os moradores ativos (role: resident). Familiares não serão incluídos.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Mês de Referência</label>
+                  <input required name="period" type="month" defaultValue={new Date().toISOString().slice(0, 7)} className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 outline-none shadow-inner" />
+                </div>
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo</label>
+                  <select name="type" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 shadow-inner">
+                    <option value="condo_fee">Taxa Condominial</option>
+                    <option value="rent">Aluguel</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor Padrão (R$)</label>
+                  <input required name="amount" type="number" step="0.01" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 shadow-inner" placeholder="0,00" />
+                </div>
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Data de Vencimento</label>
+                  <input required name="due_date" type="date" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 shadow-inner" />
+                </div>
+              </div>
+
+              <button type="submit" disabled={isLoading} className="w-full py-7 bg-emerald-600 text-white rounded-[2rem] font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl shadow-emerald-100 transition-all active:scale-95 disabled:opacity-50">
+                {isLoading ? 'Processando...' : 'Gerar Cobranças em Massa'}
+              </button>
             </form>
           </div>
         </div>
