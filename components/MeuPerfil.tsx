@@ -79,6 +79,7 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
       if (profileError) throw profileError;
 
       alert('Perfil atualizado com sucesso!');
+      setPassword(''); // Limpa campo de senha para evitar erro de repetição
       window.location.reload();
       
     } catch (error: any) {
@@ -285,7 +286,7 @@ const handleInviteDependent = async (e: React.FormEvent) => {
                       </div>
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">WhatsApp *</label>
-                          <input type="tel" value={famPhone} onChange={(e)=>setFamPhone(e.target.value)} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400" placeholder="11999998888" />
+                          <input type="tel" value={famPhone} onChange={(e)=>setFamPhone(applyPhoneMask(e.target.value))} required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400" placeholder="(11) 99999-8888" />
                       </div>
                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block">Parentesco *</label>

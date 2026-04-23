@@ -47,7 +47,7 @@ const App: React.FC = () => {
       const { error } = await supabase
         .from('invites')
         .update({ status: 'accepted' })
-        .eq('email', email)
+        .ilike('email', email)
         .eq('status', 'pending');
       
       if (error) console.error('Erro ao sincronizar convite:', error);
