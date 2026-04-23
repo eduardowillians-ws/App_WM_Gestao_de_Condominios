@@ -81,7 +81,7 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
       let query = supabase
         .from('reservations')
         .select(`
-          *,
+          id, area_id, user_id, resident_name, unit, date, start_time, end_time, status, area_name,
           areas:area_id(name)
         `)
         .eq('status', 'confirmed')
@@ -146,7 +146,7 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
       
       const { data, error } = await supabase
         .from('reservations')
-        .select('*')
+        .select('id, area_id, user_id, resident_name, unit, date, start_time, end_time, status, area_name')
         .eq('area_id', areaId)
         .eq('status', 'confirmed')
         .gte('date', firstDay.toISOString().split('T')[0])
@@ -180,7 +180,7 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
     try {
       const { data, error } = await supabase
         .from('reservations')
-        .select('*')
+        .select('id, area_id, user_id, resident_name, unit, date, start_time, end_time, status, area_name')
         .eq('area_id', areaId)
         .eq('date', date)
         .eq('status', 'confirmed')
