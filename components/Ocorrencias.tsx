@@ -69,7 +69,7 @@ const Ocorrencias: React.FC<OcorrenciasProps> = ({ userRole = 'resident', curren
     try {
       let query = supabase
         .from('occurrences')
-        .select('*')
+        .select('id, title, description, category, main_type, date, time, status, resident_name, unit, urgency, user_id, created_at')
         .order('created_at', { ascending: false });
 
       if (!isAdmin && currentUser) {

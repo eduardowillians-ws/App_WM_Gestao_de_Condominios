@@ -228,8 +228,19 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
 
     setIsLoading(true);
     try {
-      const startHour = selectedHours[0];
-      const endHour = String(parseInt(selectedHours[selectedHours.length - 1]) + 1).padStart(2, '0') + ':00';
+      const sortedHours = [...selectedHours].sort((a,b) => parseInt(a) - parseInt(b));
+      
+      // Validação de horários consecutivos
+      for (let i = 0; i < sortedHours.length - 1; i++) {
+        if (parseInt(sortedHours[i+1]) !== parseInt(sortedHours[i]) + 1) {
+          alert('Por favor, selecione horários consecutivos. Para horários em períodos diferentes, realize reservas separadas.');
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      const startHour = sortedHours[0];
+      const endHour = String(parseInt(sortedHours[sortedHours.length - 1]) + 1).padStart(2, '0') + ':00';
 
       for (const hour of selectedHours) {
         const nextHour = String(parseInt(hour) + 1).padStart(2, '0') + ':00';

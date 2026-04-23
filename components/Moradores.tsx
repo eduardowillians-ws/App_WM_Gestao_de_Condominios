@@ -324,7 +324,7 @@ const Moradores: React.FC = () => {
       await supabase
         .from('vehicle_tags')
         .update({ unit: newUnit })
-        .eq('resident_id', resident.id);
+        .eq('profile_id', resident.id);
 
       const newBlockName = blocks.find(b => b.id === newBlockId)?.name || newBlockId;
       alert('Morador transferido para ' + newBlockName + ' - Apto ' + newUnit);
