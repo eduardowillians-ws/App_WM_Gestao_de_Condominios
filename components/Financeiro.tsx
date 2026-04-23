@@ -71,6 +71,10 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
   const [activeMonthFilter, setActiveMonthFilter] = useState<string | null>(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'cashflow' | 'units'>('cashflow');
+  const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
+  const [residents, setResidents] = useState<any[]>([]);
   const [activeEntryMenu, setActiveEntryMenu] = useState<string | null>(null);
   
   // Estados para Modais de Ação
@@ -84,7 +88,119 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
 
   useEffect(() => {
     fetchEntries();
+    fetchLedger();
+    fetchResidents();
   }, []);
+
+  const fetchResidents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, unit')
+        .eq('status', 'active');
+      if (error) throw error;
+      setResidents(data || []);
+    } catch (err) {
+      console.error('Error fetching residents:', err);
+    }
+  };
+
+  const fetchLedger = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('resident_ledger')
+        .select('*')
+        .order('due_date', { ascending: false });
+      if (error) throw error;
+      setLedgerEntries(data || []);
+    } catch (err) {
+      console.error('Error fetching ledger:', err);
+    }
+  };
+
+  const handleRegisterLedger = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const profileId = formData.get('profile_id') as string;
+      const resident = residents.find(r => r.id === profileId);
+      
+      const { error } = await supabase
+        .from('resident_ledger')
+        .insert({
+          profile_id: profileId,
+          resident_name: resident?.name || 'Morador',
+          unit: resident?.unit || '---',
+          amount: parseFloat(formData.get('amount') as string),
+          due_date: formData.get('due_date') as string,
+          type: formData.get('type') as string,
+          status: 'pending',
+          notes: formData.get('notes') as string
+        });
+
+      if (error) throw error;
+
+      await fetchLedger();
+      setIsLedgerModalOpen(false);
+      alert('Cobrança registrada com sucesso!');
+    } catch (err: any) {
+      alert('Erro: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const calculateProRata = (totalAmount: number, entryDate: string) => {
+    const date = entryDate ? new Date(entryDate) : new Date();
+    const totalDays = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    const occupiedDays = totalDays - date.getDate() + 1;
+    return (totalAmount / totalDays) * occupiedDays;
+  };
+
+  const handleUpdateLedgerStatus = async (id: string, status: 'paid' | 'overdue') => {
+    setIsLoading(true);
+    try {
+      const { data: ledgerEntry, error: getError } = await supabase
+        .from('resident_ledger')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (getError) throw getError;
+
+      const { error } = await supabase
+        .from('resident_ledger')
+        .update({ status, paid_at: status === 'paid' ? new Date().toISOString() : null })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Se foi pago, criar entrada automática no Fluxo de Caixa Geral
+      if (status === 'paid') {
+        const { error: entryError } = await supabase
+          .from('financial_entries')
+          .insert({
+            description: `Pgto ${ledgerEntry.type === 'rent' ? 'Aluguel' : 'Condomínio'} - Un. ${ledgerEntry.unit}`,
+            entry_type: 'RECEITA',
+            category: 'Receita Operacional',
+            amount: ledgerEntry.amount,
+            date: new Date().toISOString().split('T')[0],
+            status: 'paid'
+          });
+        if (entryError) console.error('Erro ao criar lançamento automático:', entryError);
+      }
+
+      await fetchLedger();
+      await fetchEntries();
+      alert('Status atualizado!');
+    } catch (err: any) {
+      alert('Erro ao atualizar: ' + err.message);
+    } finally {
+      setIsLoading(false);
+      setActiveEntryMenu(null);
+    }
+  };
 
   const fetchEntries = async () => {
     setIsLoading(true);
@@ -322,203 +438,333 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
         </div>
       </header>
 
-      {/* Barra de Filtros */}
-      <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-6">
-        <div className="flex items-center space-x-6">
-          <div className="flex flex-col">
-            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Ano</label>
-            <select 
-              value={selectedYear} 
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="bg-slate-50 border-none text-xs font-black text-slate-700 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-yellow-400"
-            >
-              {['2024', '2025', '2026'].map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Mês de Referência</label>
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button onClick={() => setActiveMonthFilter(null)} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${!activeMonthFilter ? 'bg-white shadow-sm text-slate-900' : 'text-gray-400'}`}>Todos</button>
-              {MONTHS.map(m => (
-                <button key={m.label} onClick={() => setActiveMonthFilter(m.value)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${activeMonthFilter === m.value ? 'bg-white shadow-sm text-slate-900' : 'text-gray-400'}`}>{m.label}</button>
-              ))}
+      {/* Navegação entre Visões */}
+      <div className="flex space-x-8 border-b border-gray-100">
+        <button 
+          onClick={() => setActiveTab('cashflow')} 
+          className={`pb-4 px-2 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === 'cashflow' ? 'text-slate-900' : 'text-gray-400'}`}
+        >
+          <i className="fa-solid fa-chart-line mr-2"></i> Fluxo de Caixa
+          {activeTab === 'cashflow' && <div className="absolute bottom-0 left-0 w-full h-1 mycond-bg-yellow rounded-t-full"></div>}
+        </button>
+        <button 
+          onClick={() => setActiveTab('units')} 
+          className={`pb-4 px-2 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === 'units' ? 'text-slate-900' : 'text-gray-400'}`}
+        >
+          <i className="fa-solid fa-hotel mr-2"></i> Gestão de Unidades & Aluguel
+          {activeTab === 'units' && <div className="absolute bottom-0 left-0 w-full h-1 mycond-bg-yellow rounded-t-full"></div>}
+        </button>
+      </div>
+
+      {/* Barra de Filtros (Apenas para Fluxo de Caixa) */}
+      {activeTab === 'cashflow' && (
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-6 slide-in-from-top-4">
+          <div className="flex items-center space-x-6">
+            <div className="flex flex-col">
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Ano</label>
+              <select 
+                value={selectedYear} 
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="bg-slate-50 border-none text-xs font-black text-slate-700 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-yellow-400"
+              >
+                {['2024', '2025', '2026'].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Mês de Referência</label>
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button onClick={() => setActiveMonthFilter(null)} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${!activeMonthFilter ? 'bg-white shadow-sm text-slate-900' : 'text-gray-400'}`}>Todos</button>
+                {MONTHS.map(m => (
+                  <button key={m.label} onClick={() => setActiveMonthFilter(m.value)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${activeMonthFilter === m.value ? 'bg-white shadow-sm text-slate-900' : 'text-gray-400'}`}>{m.label}</button>
+                ))}
+              </div>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+              {activeCategoryFilter && (
+                <button onClick={() => setActiveCategoryFilter(null)} className="text-[10px] font-black text-blue-600 uppercase flex items-center bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 hover:bg-blue-100 transition-all">
+                  <i className="fa-solid fa-filter mr-2"></i> Filtro: {activeCategoryFilter}
+                </button>
+              )}
+              {activeMonthFilter && (
+                <button onClick={() => setActiveMonthFilter(null)} className="text-[10px] font-black text-red-500 uppercase flex items-center bg-red-50 px-4 py-2 rounded-xl border border-red-100 hover:bg-red-100 transition-all">
+                  <i className="fa-solid fa-circle-xmark mr-2"></i> Limpar Mês
+                </button>
+              )}
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-            {activeCategoryFilter && (
-              <button onClick={() => setActiveCategoryFilter(null)} className="text-[10px] font-black text-blue-600 uppercase flex items-center bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 hover:bg-blue-100 transition-all">
-                <i className="fa-solid fa-filter mr-2"></i> Filtro: {activeCategoryFilter}
-              </button>
-            )}
-            {activeMonthFilter && (
-              <button onClick={() => setActiveMonthFilter(null)} className="text-[10px] font-black text-red-500 uppercase flex items-center bg-red-50 px-4 py-2 rounded-xl border border-red-100 hover:bg-red-100 transition-all">
-                <i className="fa-solid fa-circle-xmark mr-2"></i> Limpar Mês
-              </button>
-            )}
-        </div>
-      </div>
+      )}
 
-      {/* Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Receitas Período</p>
-          <h3 className="text-2xl font-black text-emerald-500">R$ {metrics.receitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+      {/* Métricas (Fluxo de Caixa) */}
+      {activeTab === 'cashflow' && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in slide-in-from-bottom-4">
+          <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Receitas Período</p>
+            <h3 className="text-2xl font-black text-emerald-500">R$ {metrics.receitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+          </div>
+          <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Despesas Período</p>
+            <h3 className="text-2xl font-black text-red-500">R$ {metrics.despesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+          </div>
+          <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
+            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Inadimplência <i className="fa-solid fa-triangle-exclamation"></i></p>
+            <h3 className="text-2xl font-black text-red-600">{metrics.inadimplencia}%</h3>
+          </div>
+          <div className="bg-slate-900 p-7 rounded-[2.5rem] shadow-xl flex flex-col justify-center">
+            <p className="text-[10px] font-black text-yellow-400 uppercase tracking-widest mb-1">Saldo Líquido</p>
+            <h3 className={`text-2xl font-black ${metrics.saldo >= 0 ? 'text-white' : 'text-red-400'}`}>R$ {metrics.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+          </div>
         </div>
-        <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Despesas Período</p>
-          <h3 className="text-2xl font-black text-red-500">R$ {metrics.despesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
-        </div>
-        <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center">
-          <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Inadimplência <i className="fa-solid fa-triangle-exclamation"></i></p>
-          <h3 className="text-2xl font-black text-red-600">{metrics.inadimplencia}%</h3>
-        </div>
-        <div className="bg-slate-900 p-7 rounded-[2.5rem] shadow-xl flex flex-col justify-center">
-          <p className="text-[10px] font-black text-yellow-400 uppercase tracking-widest mb-1">Saldo Líquido</p>
-          <h3 className={`text-2xl font-black ${metrics.saldo >= 0 ? 'text-white' : 'text-red-400'}`}>R$ {metrics.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
-        </div>
-      </div>
+      )}
 
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm flex flex-col min-h-[450px] relative">
-          <div className="flex justify-between items-center mb-8">
-            <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Fluxo {activeMonthFilter ? 'Diário' : 'Anual'} de Caixa</h4>
-            <div className="flex space-x-4 text-[10px] font-black uppercase">
-              <span className="text-blue-500">Receitas</span>
-              <span className="text-red-400">Despesas</span>
+        {/* Gráficos e Tabela (Fluxo de Caixa) */}
+      {activeTab === 'cashflow' && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-700">
+            <div className="lg:col-span-2 bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm flex flex-col min-h-[450px] relative">
+              <div className="flex justify-between items-center mb-8">
+                <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Fluxo {activeMonthFilter ? 'Diário' : 'Anual'} de Caixa</h4>
+                <div className="flex space-x-4 text-[10px] font-black uppercase">
+                  <span className="text-blue-500">Receitas</span>
+                  <span className="text-red-400">Despesas</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} onClick={(s: any) => s && s.activePayload && !activeMonthFilter && setActiveMonthFilter(s.activePayload[0].payload.value)}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8', fontWeight: 900}} interval={activeMonthFilter ? 1 : 0} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                    <Tooltip cursor={{fill: '#f8fafc'}} />
+                    <Bar dataKey="receitas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="despesas" fill={activeCategoryFilter ? CATEGORY_COLORS[activeCategoryFilter] : '#f87171'} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm flex flex-col min-h-[450px]">
+              <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em] mb-8 text-center uppercase">Despesas por Categoria</h4>
+              <div className="flex-1 relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={75} outerRadius={105} paddingAngle={5} dataKey="value" onClick={(d) => d && d.name && setActiveCategoryFilter(activeCategoryFilter === d.name ? null : d.name)}>
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#cbd5e1'} className={`cursor-pointer transition-all duration-300 ${activeCategoryFilter === entry.name ? 'scale-105 opacity-100' : activeCategoryFilter ? 'opacity-30' : 'opacity-100'}`} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomPieTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
-          <div className="flex-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} onClick={(s: any) => s && s.activePayload && !activeMonthFilter && setActiveMonthFilter(s.activePayload[0].payload.value)}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8', fontWeight: 900}} interval={activeMonthFilter ? 1 : 0} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-                <Tooltip cursor={{fill: '#f8fafc'}} />
-                <Bar dataKey="receitas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesas" fill={activeCategoryFilter ? CATEGORY_COLORS[activeCategoryFilter] : '#f87171'} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
 
-        <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm flex flex-col min-h-[450px]">
-          <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em] mb-8 text-center uppercase">Despesas por Categoria</h4>
-          <div className="flex-1 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={75} outerRadius={105} paddingAngle={5} dataKey="value" onClick={(d) => d && d.name && setActiveCategoryFilter(activeCategoryFilter === d.name ? null : d.name)}>
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#cbd5e1'} className={`cursor-pointer transition-all duration-300 ${activeCategoryFilter === entry.name ? 'scale-105 opacity-100' : activeCategoryFilter ? 'opacity-30' : 'opacity-100'}`} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomPieTooltip />} />
-                <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="text-center text-[9px] text-gray-400 font-bold uppercase mt-4 italic">Clique em uma fatia para filtrar o fluxo</p>
-        </div>
-      </div>
-
-      {/* Extrato Detalhado */}
-      <div className="bg-white rounded-[3.5rem] shadow-sm border border-gray-100 overflow-hidden relative z-0">
-        <div className="px-12 py-10 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
-          <h4 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Extrato Detalhado de Movimentações</h4>
-          <span className="text-[10px] font-black text-gray-400 uppercase">{filteredEntries.length} Registros</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-gray-400 text-[10px] uppercase font-black border-b border-gray-50">
-                <th className="px-12 py-6">Mês / Data</th>
-                <th className="px-8 py-6">Descrição</th>
-                <th className="px-8 py-6">Categoria</th>
-                <th className="px-8 py-6">Valor</th>
-                <th className="px-8 py-6 text-center">Status</th>
-                <th className="px-12 py-6 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredEntries.map(entry => (
-                <tr key={entry.id} className="group hover:bg-slate-50 transition-all">
-                  <td className="px-12 py-6">
-                    <p className="font-black text-slate-400 text-[9px] uppercase mb-1">{MONTHS.find(m => m.value === entry.date.split('-')[1])?.label}</p>
-                    <p className="font-black text-slate-800 text-xs">{new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
-                  </td>
-                  <td className="px-8 py-6">
-                    <p className="font-black text-slate-700 uppercase text-xs tracking-tight">{entry.description}</p>
-                    <div className="flex items-center mt-1">
-                      <span className={`w-2 h-2 rounded-full mr-2 ${entry.type === 'RECU' ? 'bg-emerald-500' : 'bg-red-400'}`}></span>
-                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">{entry.type === 'RECU' ? 'Crédito' : 'Débito'}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="px-4 py-1.5 border rounded-xl text-[10px] font-black uppercase flex items-center w-fit shadow-sm" style={{ borderColor: CATEGORY_COLORS[entry.category] + '40', color: CATEGORY_COLORS[entry.category], backgroundColor: CATEGORY_COLORS[entry.category] + '10' }}>
-                      <div className="w-1.5 h-1.5 rounded-full mr-2" style={{ backgroundColor: CATEGORY_COLORS[entry.category] }}></div>
-                      {entry.category}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6 font-black text-sm">
-                    <span className={entry.type === 'RECU' ? 'text-emerald-600' : 'text-slate-900'}>
-                      {entry.type === 'RECU' ? '+' : '-'} R$ {entry.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6 text-center">
-                    <span className="px-5 py-2 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">Liquidado</span>
-                  </td>
-                  <td className="px-6 py-4 text-right relative">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveEntryMenu(activeEntryMenu === entry.id ? null : entry.id);
-                      }} 
-                      className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center"
+          <div className="bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden animate-in slide-in-from-bottom-8">
+            <div className="px-10 py-8 border-b border-gray-50 flex justify-between items-center">
+              <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Histórico de Lançamentos</h4>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2"><div className="w-2 h-2 bg-blue-500 rounded-full"></div><span className="text-[9px] font-black uppercase text-gray-400">Receita</span></div>
+                <div className="flex items-center space-x-2"><div className="w-2 h-2 bg-red-400 rounded-full"></div><span className="text-[9px] font-black uppercase text-gray-400">Despesa</span></div>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-gray-50/50 border-b border-gray-100 font-black text-[10px] text-gray-400 uppercase tracking-widest">
+                    <th className="px-10 py-6">Data</th>
+                    <th className="px-6 py-6">Descrição / Categoria</th>
+                    <th className="px-6 py-6 text-right">Valor</th>
+                    <th className="px-8 py-6 text-center">Status</th>
+                    <th className="px-6 py-6 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredEntries.map(entry => (
+                    <tr 
+                      key={entry.id} 
+                      className={`hover:bg-slate-50 transition-all cursor-pointer group ${entry.status === 'cancelled' ? 'opacity-40 grayscale' : ''}`}
+                      onClick={() => setViewingEntry(entry)}
                     >
-                      <i className="fa-solid fa-ellipsis text-lg"></i>
-                    </button>
-                    {activeEntryMenu === entry.id && (
-                      <div className="absolute right-0 top-12 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-[150] min-w-[140px] flex flex-col animate-in fade-in zoom-in-95">
+                      <td className="px-10 py-6">
+                        <p className="text-xs font-black text-slate-800">{new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase">{entry.type === 'RECU' ? 'Entrada' : 'Saída'}</p>
+                      </td>
+                      <td className="px-6 py-6">
+                        <p className="text-xs font-black text-slate-800 uppercase tracking-tight">{entry.description}</p>
+                        <p className="text-[9px] font-black text-blue-500 uppercase">{entry.category}</p>
+                      </td>
+                      <td className="px-6 py-6 text-right">
+                        <span className={`text-sm font-black ${entry.type === 'RECU' ? 'text-emerald-500' : 'text-slate-900'}`}>
+                          {entry.type === 'DESP' ? '-' : ''}R$ {entry.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        <span className="px-5 py-2 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">Liquidado</span>
+                      </td>
+                      <td className="px-6 py-4 text-right relative">
                         <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setViewingEntry(entry); 
-                            setActiveEntryMenu(null); 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveEntryMenu(activeEntryMenu === entry.id ? null : entry.id);
                           }} 
-                          className="px-4 py-2.5 text-left text-xs font-bold uppercase text-slate-600 hover:bg-slate-50 rounded-xl transition-colors w-full"
+                          className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center"
                         >
-                          <i className="fa-regular fa-eye mr-2"></i>Visualizar
+                          <i className="fa-solid fa-ellipsis text-lg"></i>
                         </button>
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setProvingEntry(entry); 
-                            setActiveEntryMenu(null); 
-                          }} 
-                          className="px-4 py-2.5 text-left text-xs font-bold uppercase text-slate-600 hover:bg-slate-50 rounded-xl transition-colors w-full"
-                        >
-                          <i className="fa-solid fa-paperclip mr-2"></i>Comprovante
-                        </button>
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setDeletingEntry(entry); 
-                            setActiveEntryMenu(null); 
-                          }} 
-                          className="px-4 py-2.5 text-left text-xs font-bold uppercase text-red-500 hover:bg-red-50 rounded-xl transition-colors w-full"
-                        >
-                          <i className="fa-solid fa-trash-can mr-2"></i>Excluir
-                        </button>
-                      </div>
+                        {activeEntryMenu === entry.id && (
+                          <div className="absolute right-0 top-12 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-[150] min-w-[140px] flex flex-col animate-in fade-in zoom-in-95">
+                            <button 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setViewingEntry(entry); 
+                                setActiveEntryMenu(null); 
+                              }} 
+                              className="px-4 py-2.5 text-left text-xs font-bold uppercase text-slate-600 hover:bg-slate-50 rounded-xl transition-colors w-full"
+                            >
+                              <i className="fa-regular fa-eye mr-2"></i>Visualizar
+                            </button>
+                            <button 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setProvingEntry(entry); 
+                                setActiveEntryMenu(null); 
+                              }} 
+                              className="px-4 py-2.5 text-left text-xs font-bold uppercase text-slate-600 hover:bg-slate-50 rounded-xl transition-colors w-full"
+                            >
+                              <i className="fa-solid fa-paperclip mr-2"></i>Comprovante
+                            </button>
+                            <button 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setDeletingEntry(entry); 
+                                setActiveEntryMenu(null); 
+                              }} 
+                              className="px-4 py-2.5 text-left text-xs font-bold uppercase text-red-500 hover:bg-red-50 rounded-xl transition-colors w-full"
+                            >
+                              <i className="fa-solid fa-trash-can mr-2"></i>Excluir
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* GESTÃO DE UNIDADES (NOVA VISÃO) */}
+      {activeTab === 'units' && (
+        <div className="space-y-6 animate-in slide-in-from-bottom-8">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total a Receber (Mês)</p>
+                <h3 className="text-2xl font-black text-slate-800">R$ {(ledgerEntries.reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+              </div>
+              <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm font-black">
+                <p className="text-[10px] text-emerald-500 uppercase tracking-widest mb-1">Recebido</p>
+                <h3 className="text-2xl text-emerald-500">R$ {(ledgerEntries.filter(l => l.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+              </div>
+              <div className="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm font-black">
+                <p className="text-[10px] text-red-500 uppercase tracking-widest mb-1">Pendente / Atrasado</p>
+                <h3 className="text-2xl text-red-500">R$ {(ledgerEntries.filter(l => l.status !== 'paid').reduce((acc, curr) => acc + curr.amount, 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+              </div>
+           </div>
+
+           <div className="bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-10 py-8 border-b border-gray-50 flex justify-between items-center bg-slate-50/50">
+                <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Histórico de Cobranças por Unidade</h4>
+                <button 
+                  onClick={() => setIsLedgerModalOpen(true)}
+                  className="mycond-bg-blue text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all"
+                >
+                  + NOVA COBRANÇA
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50/50 border-b border-gray-100 font-black text-[10px] text-gray-400 uppercase tracking-widest">
+                      <th className="px-10 py-6">Morador / Unidade</th>
+                      <th className="px-6 py-6 font-center">Vencimento</th>
+                      <th className="px-6 py-6 text-right">Valor</th>
+                      <th className="px-8 py-6 text-center">Status</th>
+                      <th className="px-6 py-6 text-right">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {ledgerEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-10 py-20 text-center text-gray-300">
+                          <i className="fa-solid fa-receipt text-5xl mb-4"></i>
+                          <p className="font-black uppercase text-xs">Nenhuma cobrança registrada ainda.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      ledgerEntries.map(l => (
+                        <tr key={l.id} className="hover:bg-slate-50 transition-all group">
+                          <td className="px-10 py-6">
+                            <p className="text-xs font-black text-slate-800 uppercase">{l.resident_name}</p>
+                            <p className="text-[9px] text-gray-400 font-black uppercase">Unidade: {l.unit}</p>
+                          </td>
+                          <td className="px-6 py-6">
+                            <p className="text-xs font-black text-slate-600">{new Date(l.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                          </td>
+                          <td className="px-6 py-6 text-right">
+                            <span className="text-sm font-black text-slate-900">R$ {l.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </td>
+                          <td className="px-8 py-6 text-center">
+                            <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                              l.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                              l.status === 'overdue' ? 'bg-red-50 text-red-600 border-red-100' :
+                              'bg-yellow-50 text-yellow-600 border-yellow-100'
+                            }`}>
+                              {l.status === 'paid' ? 'Liquidado' : l.status === 'overdue' ? 'Atrasado' : 'Pendente'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right relative">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveEntryMenu(activeEntryMenu === l.id ? null : l.id);
+                              }}
+                              className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center"
+                            >
+                              <i className="fa-solid fa-ellipsis text-lg"></i>
+                            </button>
+                            {activeEntryMenu === l.id && (
+                              <div className="absolute right-0 top-12 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-[150] min-w-[140px] flex flex-col animate-in fade-in zoom-in-95">
+                                {l.status !== 'paid' && (
+                                  <button 
+                                    onClick={() => handleUpdateLedgerStatus(l.id, 'paid')}
+                                    className="px-4 py-2.5 text-left text-xs font-bold uppercase text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors w-full"
+                                  >
+                                    <i className="fa-solid fa-check mr-2"></i>Confirmar Pgto
+                                  </button>
+                                )}
+                                {l.status === 'pending' && (
+                                  <button 
+                                    onClick={() => handleUpdateLedgerStatus(l.id, 'overdue')}
+                                    className="px-4 py-2.5 text-left text-xs font-bold uppercase text-red-500 hover:bg-red-50 rounded-xl transition-colors w-full"
+                                  >
+                                    <i className="fa-solid fa-triangle-exclamation mr-2"></i>Marcar Atraso
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </tbody>
+                </table>
+              </div>
+           </div>
         </div>
-      </div>
+      )}
 
       {/* Modal Visualizar Detalhes */}
       {viewingEntry && (
@@ -707,6 +953,68 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
                 <div className="space-y-3"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Data Competência</label><input required name="date" type="date" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 shadow-inner" /></div>
               </div>
               <button type="submit" className="w-full py-7 mycond-bg-yellow rounded-[2rem] font-black text-slate-900 hover:bg-yellow-500 shadow-2xl shadow-yellow-100 uppercase text-[11px] tracking-[0.2em] transition-all active:scale-95">Confirmar Registro</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nova Cobrança de Unidade */}
+      {isLedgerModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-2xl animate-in fade-in" onClick={() => setIsLedgerModalOpen(false)}></div>
+          <div className="relative bg-white w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="px-14 py-12 mycond-bg-blue text-white flex justify-between items-center">
+              <div><h3 className="text-3xl font-black uppercase tracking-tighter">Cobrança de Unidade</h3><p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Aluguel & Taxas Mensais</p></div>
+              <button onClick={() => setIsLedgerModalOpen(false)} className="w-14 h-14 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            <form onSubmit={handleRegisterLedger} className="p-14 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
+              <div className="space-y-3">
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Selecionar Morador / Unidade</label>
+                <select required name="profile_id" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 outline-none shadow-inner">
+                  <option value="">Selecione o morador...</option>
+                  {residents.map(r => <option key={r.id} value={r.id}>{r.name} - Apt {r.unit}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo de Cobrança</label>
+                  <select name="type" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 outline-none shadow-inner">
+                    <option value="rent">Aluguel</option>
+                    <option value="condo_fee">Taxa Condominial</option>
+                    <option value="other">Outros</option>
+                  </select>
+                </div>
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Data de Vencimento</label>
+                  <input required name="due_date" type="date" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 shadow-inner" />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor da Cobrança (R$)</label>
+                <div className="flex gap-4">
+                  <input id="ledgerAmount" required name="amount" type="number" step="0.01" className="flex-1 bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 shadow-inner" placeholder="0,00" />
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const dateField = document.getElementsByName('due_date')[0] as HTMLInputElement;
+                      if (!dateField.value) return alert('Selecione a data de vencimento primeiro.');
+                      const amountField = document.getElementById('ledgerAmount') as HTMLInputElement;
+                      const currentAmount = parseFloat(amountField.value) || 0;
+                      const prorated = calculateProRata(currentAmount, dateField.value);
+                      amountField.value = prorated.toFixed(2);
+                    }}
+                    className="px-6 bg-yellow-50 text-yellow-600 border border-yellow-100 rounded-2xl text-[9px] font-black uppercase hover:bg-yellow-100 transition-all"
+                  >
+                    Calcular Pro-rata
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Notas / Observações</label><textarea name="notes" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 outline-none shadow-inner h-24" placeholder="Ex: Referente a Janeiro/2025" /></div>
+
+              <button type="submit" className="w-full py-7 mycond-bg-blue text-white rounded-[2rem] font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl shadow-blue-100 transition-all active:scale-95">Gerar Cobrança</button>
             </form>
           </div>
         </div>

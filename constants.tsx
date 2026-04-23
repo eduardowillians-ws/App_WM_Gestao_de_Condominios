@@ -77,7 +77,7 @@ export const MANUAL_CATEGORIES: ManualCategory[] = [
 
 export const AREAS_RESERVA: AreaReserva[] = [
   { 
-    id: 'gym',
+    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     name: 'Academia', 
     image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=600&q=80',
     capacity: 20,
@@ -86,7 +86,7 @@ export const AREAS_RESERVA: AreaReserva[] = [
     rules: ['Uso obrigatório de toalha', 'Limite de 60 minutos por aparelho em horários de pico', 'Proibido circular sem camisa']
   },
   { 
-    id: 'outdoor_gym',
+    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
     name: 'Academia Ar Livre', 
     image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=600&q=80',
     capacity: 20,
@@ -95,7 +95,7 @@ export const AREAS_RESERVA: AreaReserva[] = [
     rules: ['Uso livre para moradores', 'Mantenha o distanciamento', 'Zele pelos equipamentos fixos']
   },
   { 
-    id: 'auditorium',
+    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',
     name: 'Auditório', 
     image: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=600&q=80',
     capacity: 50,
@@ -104,7 +104,7 @@ export const AREAS_RESERVA: AreaReserva[] = [
     rules: ['Reserva mínima de 2 horas', 'Proibido consumo de alimentos pesados', 'Taxa de limpeza inclusa no valor']
   },
   { 
-    id: 'kids',
+    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14',
     name: 'Brinquedoteca', 
     image: 'https://images.unsplash.com/photo-1566411520896-01e7ca4726af?auto=format&fit=crop&w=600&q=80',
     capacity: 15,
@@ -113,7 +113,7 @@ export const AREAS_RESERVA: AreaReserva[] = [
     rules: ['Crianças devem estar acompanhadas por um adulto', 'Proibido calçados no tapete', 'Mantenha os brinquedos organizados após o uso']
   },
   { 
-    id: 'bbq',
+    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15',
     name: 'Churrasqueira', 
     image: 'https://images.unsplash.com/photo-1529193591184-b1d58b34ecdf?auto=format&fit=crop&w=600&q=80',
     capacity: 30,
@@ -122,7 +122,7 @@ export const AREAS_RESERVA: AreaReserva[] = [
     rules: ['Limpeza por conta do morador ou contratação à parte', 'Som em volume moderado até as 22h', 'Taxa de uso para gás e manutenção']
   },
   { 
-    id: 'party_room',
+    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a16',
     name: 'Salão de Festas', 
     image: 'https://images.unsplash.com/photo-1530103043960-ef38714abb15?auto=format&fit=crop&w=600&q=80',
     capacity: 100,

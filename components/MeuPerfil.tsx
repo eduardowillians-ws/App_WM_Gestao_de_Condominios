@@ -38,7 +38,10 @@ const MeuPerfil: React.FC<MeuPerfilProps> = ({ currentUser }) => {
   const applyCPFMask = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').substring(0, 14);
   const applyRGMask = (v: string) => v.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').substring(0, 12);
   const applyPhoneMask = (v: string) => {
-    const raw = v.replace(/\D/g, '').substring(0, 11);
+    let raw = v.replace(/\D/g, '');
+    if (raw.startsWith('55') && raw.length > 11) raw = raw.substring(2);
+    raw = raw.substring(0, 11);
+    
     if (raw.length <= 10) {
       return raw.replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2');
     }

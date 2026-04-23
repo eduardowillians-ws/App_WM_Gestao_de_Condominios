@@ -65,8 +65,8 @@ const Documentos: React.FC<DocumentosProps> = ({ userRole = 'resident', currentU
     return docs.filter(doc => {
       const matchesCategory = filterCategory === 'Tudo' || doc.category === filterCategory;
       const matchesStatus = filterStatus === 'Tudo' || doc.status === filterStatus;
-      const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          doc.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (doc.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (doc.description || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       // Moradores não veem arquivos arquivados na lista geral
       if (!isAdmin && doc.status === 'Arquivado') return false;
@@ -286,12 +286,12 @@ const Documentos: React.FC<DocumentosProps> = ({ userRole = 'resident', currentU
                         <i className={doc.status === 'Arquivado' ? "fa-solid fa-box-archive" : "fa-solid fa-file-pdf"}></i>
                       </div>
                       <div>
-                        <p className={`font-black text-slate-800 text-xs uppercase tracking-tight ${doc.status === 'Arquivado' ? 'italic' : ''}`}>{doc.name}</p>
+                        <p className={`font-black text-slate-800 text-xs uppercase tracking-tight ${doc.status === 'Arquivado' ? 'italic' : ''}`}>{doc.name || 'Sem nome'}</p>
                         <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-1">{doc.category} • {doc.size}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-6 font-black text-slate-600 text-xs">{doc.uploadDate.split('-').reverse().join('/')}</td>
+                  <td className="px-6 py-6 font-black text-slate-600 text-xs">{(doc.uploadDate || '').split('-').reverse().join('/')}</td>
                   <td className="px-6 py-6">
                     {doc.expiryDate ? (
                       <p className={`font-black text-xs ${doc.status === 'Vencido' ? 'text-red-500' : 'text-slate-600'}`}>{doc.expiryDate.split('-').reverse().join('/')}</p>
@@ -411,7 +411,7 @@ const Documentos: React.FC<DocumentosProps> = ({ userRole = 'resident', currentU
                 </div>
                 <div className="p-8 bg-slate-50 rounded-[2.5rem] space-y-4 shadow-inner text-left">
                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-2">Timeline</p>
-                   <div className="flex justify-between"><span className="text-[9px] font-black text-gray-400 uppercase">Upload em</span><span className="text-[11px] font-black text-slate-800">{viewingDoc.uploadDate.split('-').reverse().join('/')}</span></div>
+                   <div className="flex justify-between"><span className="text-[9px] font-black text-gray-400 uppercase">Upload em</span><span className="text-[11px] font-black text-slate-800">{(viewingDoc.uploadDate || '').split('-').reverse().join('/')}</span></div>
                    <div className="flex justify-between"><span className="text-[9px] font-black text-gray-400 uppercase">Validade</span><span className="text-[11px] font-black text-slate-800">{viewingDoc.expiryDate ? viewingDoc.expiryDate.split('-').reverse().join('/') : 'Vitalício'}</span></div>
                 </div>
              </div>

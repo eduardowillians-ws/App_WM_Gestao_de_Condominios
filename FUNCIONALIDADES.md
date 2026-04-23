@@ -323,7 +323,19 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 - ✅ **Acesso a Documentos**: Liberada visualização de atas e regulamentos para Moradores e Familiares (sem permissão de alteração).
 - ✅ **Padronização de Variáveis**: Uniformização dos estados de usuário limitado em toda a hierarquia de componentes.
 
----
+### v3.0 - Estabilização de Dados e Regras de Negócio
+*   **Correção de Consultas (PostgREST)**: Substituição de `select('*')` por seleção explícita de colunas nos módulos de Reservas e Ocorrências, eliminando erros de cache de esquema.
+*   **Padronização de Colunas**: Reversão do uso de `resident_id` para `user_id` e `profile_id` de acordo com a estrutura real do banco de dados.
+*   **Regras de Reserva**: Implementação de validação para horários consecutivos (ex: não permite pular das 6h para as 9h em uma mesma reserva).
+*   **Gestão de Encomendas**: Integração com a tabela oficial `condo_blocks` (Torre Alpha/Beta), garantindo que todas as unidades oficiais apareçam no seletor da portaria.
+*   **Sincronização de Onboarding**: Ajuste para busca de e-mail "case-insensitive" no aceite de convites.
+
+### v3.1 - Módulo Financeiro de Moradores (Atual)
+*   **Gestão por Unidade**: Implementada aba "Gestão de Unidades" no módulo Financeiro para controle individual de aluguéis e taxas.
+*   **Tabela Resident Ledger**: Nova estrutura de dados para rastrear cobranças, vencimentos e status de pagamento por morador.
+*   **Automação Pro-rata**: Ferramenta integrada para cálculo proporcional de cobranças baseado em dias de ocupação.
+*   **Integração de Fluxo**: Pagamentos confirmados na gestão de unidades geram automaticamente entradas no Fluxo de Caixa Geral.
+*   **Status Inteligente**: Identificação visual de pagamentos pendentes, liquidados e em atraso.
 
 ---
 

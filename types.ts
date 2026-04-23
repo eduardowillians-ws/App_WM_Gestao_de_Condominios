@@ -299,3 +299,15 @@ export interface CondoBlock {
   totalUnits: number;
   units: string[];
 }
+export interface ResidentLedger {
+  id: string;
+  profile_id: string;
+  resident_name: string;
+  unit: string;
+  amount: number;
+  due_date: string;
+  status: 'paid' | 'pending' | 'overdue';
+  type: 'rent' | 'condo_fee' | 'other';
+  paid_at?: string;
+  notes?: string;
+}

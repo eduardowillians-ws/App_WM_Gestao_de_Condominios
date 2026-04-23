@@ -120,16 +120,17 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
       const selectedUnit = formData.get('unit') as string;
       const blockName = selectedUnit ? selectedUnit.replace(/[0-9]/g, '').trim() : selectedBlock || '';
       
-      // Buscar perfil do morador pela unidade
-      const { data: profileData, error: profileError } = await supabase
+      // Buscar perfil do morador pela unidade (pega o primeiro disponível)
+      const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id, name, phone')
         .eq('unit', selectedUnit)
-        .eq('role', 'resident')
-        .single();
+        .limit(1);
+      
+      const profileData = profiles?.[0];
       
       if (profileError || !profileData) {
-        alert('Unidade não encontrada. Selecione uma unidade válida.');
+        alert('Unidade não encontrada ou sem moradores cadastrados. Selecione uma unidade válida.');
         setIsLoading(false);
         return;
       }

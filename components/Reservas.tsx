@@ -66,7 +66,7 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
         .order('name');
       
       if (error) throw error;
-      setAreas(data || AREAS_RESERVA);
+      setAreas(data && data.length > 0 ? data : AREAS_RESERVA);
     } catch (err) {
       console.log('Fallback to local areas:', err);
       setAreas(AREAS_RESERVA);
@@ -249,7 +249,7 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
           .from('reservations')
           .select('id')
           .eq('area_id', selectedArea.id)
-          .eq('date', formData.date)
+          .eq('date', selectedDate)
           .eq('status', 'confirmed')
           .lt('start_time', nextHour)
           .gt('end_time', hour);
@@ -269,7 +269,7 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
           user_id: currentUser.id,
           resident_name: currentUser.name,
           unit: currentUser.unit,
-          date: formData.date,
+          date: selectedDate,
           start_time: startHour,
           end_time: endHour,
           status: 'confirmed',
@@ -835,8 +835,8 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#92400e]">Data/Horário</span>
                   <p className="text-sm font-black text-slate-800 mt-1">
-                    {formData.date 
-                      ? new Date(formData.date + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
+                    {selectedDate 
+                      ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
                       : '—'}
                   </p>
                   {selectedHours.length > 0 && (
