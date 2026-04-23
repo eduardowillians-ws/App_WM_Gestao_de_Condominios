@@ -41,6 +41,21 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Atualiza o status do convite para 'accepted' assim que o usuário entra
+  const syncInvitationStatus = async (email: string) => {
+    try {
+      const { error } = await supabase
+        .from('invites')
+        .update({ status: 'accepted' })
+        .eq('email', email)
+        .eq('status', 'pending');
+      
+      if (error) console.error('Erro ao sincronizar convite:', error);
+    } catch (err) {
+      console.error('Falha técnica ao atualizar convite:', err);
+    }
+  };
+
   const handleSession = async (session: any) => {
     if (session) {
       // Busca os detalhes extras na tabela profiles
@@ -69,6 +84,11 @@ const App: React.FC = () => {
           can_invite: profile.can_invite || false
         });
         setIsAuthenticated(true);
+        
+        // Sincroniza o convite se houver um e-mail na sessão
+        if (session.user.email) {
+          syncInvitationStatus(session.user.email);
+        }
       } else {
         setIsAuthenticated(false);
       }
