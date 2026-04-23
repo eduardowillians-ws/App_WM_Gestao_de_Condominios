@@ -6,12 +6,19 @@ import { supabase } from '../lib/supabase';
 const CATEGORIES = ['Tudo', 'Regimento', 'Atas', 'Contratos', 'Seguros', 'Jurídico'];
 const STATUSES = ['Tudo', 'Válido', 'Vencido', 'Pendente', 'Arquivado'];
 
-const Documentos: React.FC = () => {
+interface DocumentosProps {
+  userRole?: 'admin' | 'resident' | 'manager' | 'familiar';
+  currentUser?: any;
+}
+
+const Documentos: React.FC<DocumentosProps> = ({ userRole = 'resident', currentUser }) => {
   const [docs, setDocs] = useState<JuridicalDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('Tudo');
   const [filterStatus, setFilterStatus] = useState('Tudo');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const isAdmin = userRole === 'admin' || userRole === 'manager';
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [viewingDoc, setViewingDoc] = useState<JuridicalDocument | null>(null);
   
@@ -59,6 +66,10 @@ const Documentos: React.FC = () => {
       const matchesStatus = filterStatus === 'Tudo' || doc.status === filterStatus;
       const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           doc.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Moradores não veem arquivos arquivados na lista geral
+      if (!isAdmin && doc.status === 'Arquivado') return false;
+
       return matchesCategory && matchesStatus && matchesSearch;
     });
   }, [docs, filterCategory, filterStatus, searchTerm]);
@@ -205,12 +216,14 @@ const Documentos: React.FC = () => {
           <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Repositório Digital / Jurídico</h2>
           <p className="text-sm text-gray-500 font-medium italic">Gestão documental centralizada MyCond.</p>
         </div>
-        <button 
-          onClick={() => setIsUploadModalOpen(true)}
-          className="mycond-bg-blue text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-95"
-        >
-          + Upload de Documento
-        </button>
+        {isAdmin && (
+          <button 
+            onClick={() => setIsUploadModalOpen(true)}
+            className="mycond-bg-blue text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-95"
+          >
+            + Upload de Documento
+          </button>
+        )}
       </header>
 
       {/* Filtros */}
@@ -297,7 +310,7 @@ const Documentos: React.FC = () => {
                   </td>
                   <td className="px-10 py-6 text-right">
                     <div className="flex justify-end space-x-2">
-                       {doc.status === 'Pendente' && (
+                       {isAdmin && doc.status === 'Pendente' && (
                          <button onClick={() => handleApprove(doc.id)} className="w-10 h-10 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Validar Agora">
                            <i className="fa-solid fa-check"></i>
                          </button>
@@ -305,21 +318,27 @@ const Documentos: React.FC = () => {
                        <button onClick={() => openDocDetails(doc)} className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Ver Detalhes">
                           <i className="fa-solid fa-eye"></i>
                        </button>
-                       {doc.status !== 'Arquivado' ? (
-                         <button onClick={() => handleArchive(doc.id)} className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-amber-500 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Arquivar">
-                           <i className="fa-solid fa-box-archive"></i>
-                         </button>
-                       ) : (
-                         <button onClick={() => handleRestore(doc.id)} className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-emerald-500 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Desarquivar">
-                           <i className="fa-solid fa-arrow-rotate-left"></i>
-                         </button>
+                       {isAdmin && (
+                         <>
+                           {doc.status !== 'Arquivado' ? (
+                             <button onClick={() => handleArchive(doc.id)} className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-amber-500 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Arquivar">
+                               <i className="fa-solid fa-box-archive"></i>
+                             </button>
+                           ) : (
+                             <button onClick={() => handleRestore(doc.id)} className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-emerald-500 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Desarquivar">
+                               <i className="fa-solid fa-arrow-rotate-left"></i>
+                             </button>
+                           )}
+                         </>
                        )}
                        <button onClick={() => handleSimulateView(doc)} className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:bg-blue-500 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Baixar">
                           <i className="fa-solid fa-download"></i>
                        </button>
-                       <button onClick={() => handleDelete(doc.id)} className="w-10 h-10 bg-white border border-slate-200 text-red-300 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Excluir">
-                          <i className="fa-solid fa-trash-can"></i>
-                       </button>
+                       {isAdmin && (
+                        <button onClick={() => handleDelete(doc.id)} className="w-10 h-10 bg-white border border-slate-200 text-red-300 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center" title="Excluir">
+                            <i className="fa-solid fa-trash-can"></i>
+                        </button>
+                       )}
                     </div>
                   </td>
                 </tr>

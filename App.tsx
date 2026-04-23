@@ -104,11 +104,11 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (!currentUser) return null;
-    const isResident = currentUser.role === 'resident';
+    const isLimitedUser = currentUser.role === 'resident' || currentUser.role === 'familiar';
     const isManager = currentUser.role === 'manager';
 
-    // Se resident tentar acessar DASHBOARD via URL, redireciona para votacao
-    if (activeView === View.DASHBOARD && isResident) {
+    // Se usuário limitado tentar acessar DASHBOARD via URL, redireciona para votacao
+    if (activeView === View.DASHBOARD && isLimitedUser) {
       return <Assembleias userRole={currentUser.role} currentUser={currentUser} />;
     }
 

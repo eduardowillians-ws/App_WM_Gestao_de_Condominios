@@ -17,8 +17,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, currentUser
     // Admin vê tudo (não precisa de verificação extra pois já tem Dashboard)
     if (currentUser.role === 'admin') return true;
 
-    // Acesso do Morador (resident) e Familiar (familiar)
-    if (currentUser.role === 'resident' || currentUser.role === 'familiar') {
+    // Acesso do Morador Principal (resident)
+    if (currentUser.role === 'resident') {
+      return [
+        View.VOTACAO,
+        View.ENCOMENDAS,
+        View.RESERVAS,
+        View.OCORRENCIAS,
+        View.DOCUMENTOS
+      ].includes(item.id);
+    }
+
+    // Acesso do Familiar (familiar)
+    if (currentUser.role === 'familiar') {
       return [
         View.VOTACAO,
         View.ENCOMENDAS,
@@ -37,6 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, currentUser
         View.RESERVAS,
         View.ENCOMENDAS,
         View.VOTACAO,
+        View.DOCUMENTOS,
         View.MANUTENCAO,
         View.MANUAL_SINDICO
       ].includes(item.id);

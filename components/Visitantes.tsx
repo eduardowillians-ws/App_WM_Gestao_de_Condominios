@@ -79,9 +79,20 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
   const fetchVisitors = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('visitors')
-        .select('*')
+        .select('*');
+
+      if (!isAdmin && currentUser) {
+        if (currentUser.role === 'resident') {
+          query = query.eq('unit', currentUser.unit);
+        } else {
+          // Familiar vê apenas os convidados que ele criou
+          query = query.eq('created_by', currentUser.id);
+        }
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -107,11 +118,24 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
 
   const fetchVehicleTags = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('vehicle_tags')
         .select('*')
-        .eq('status', 'active')
-        .order('plate');
+        .eq('status', 'active');
+
+      if (!isAdmin && currentUser) {
+        if (currentUser.role === 'resident') {
+          query = query.eq('unit', currentUser.unit);
+        } else {
+          // No caso de tags, geralmente o familiar cadastra o seu próprio carro.
+          // Como não temos um explicit 'created_by' em todas as tabelas, vamos tentar 'unit' para morador e 'plate' vinculado se houvesse,
+          // mas por segurança e simplicidade atual, moradores veem da unidade.
+          // Se o usuário quer "apenas os dele", filtramos pela unidade para garantir que não veja do prédio todo.
+          query = query.eq('unit', currentUser.unit);
+        }
+      }
+
+      const { data, error } = await query.order('plate');
 
       if (error) throw error;
 

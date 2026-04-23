@@ -73,7 +73,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
           delivered_at,
           notified_at,
           tracking_code,
-          profiles(id, name, unit, phone)
+          profiles:profile_id(id, name, unit, phone)
         `)
         .order('received_at', { ascending: false });
 

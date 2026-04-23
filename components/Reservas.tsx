@@ -80,7 +80,10 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
     try {
       let query = supabase
         .from('reservations')
-        .select('*, areas(name)')
+        .select(`
+          *,
+          areas:area_id(name)
+        `)
         .eq('status', 'confirmed')
         .order('date', { ascending: true });
 

@@ -299,10 +299,24 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 
 ---
 
+### v2.7 - Onboarding e Hierarquia de Acesso (Familiar vs. Morador):
+- ✅ **Acesso Hierárquico**: Diferenciação real entre Morador Principal e Familiar.
+- ✅ **Visibilidade Restrita**: Familiares visualizam apenas seus próprios registros em:
+  - Encomendas, Ocorrências, Reservas e Visitantes.
+- ✅ **Sincronização de Onboarding**: Atualização automática do status do convite (`pending` -> `accepted`) no primeiro login.
+- ✅ **Correções de API (PGRST201/406)**: 
+  - Resolvido erro de "Ambiguous Join" especificando chaves estrangeiras.
+  - Otimização de busca de votos em Assembleias (fim de requisições em loop).
+- ✅ **Segurança de Dashboard**: Redirect automático de moradores para Assembleias ao tentar acessar o painel global.
+- ✅ **Privacidade Financeira**: Ocultação do Livro Caixa (Geral) para Moradores/Familiares.
+
+---
+
 ## 📝 Status Atual
 - Dashboard com dados reais ✅
 - Filtros de mês/ano funcionando ✅
 - Registro de acessos implementado ✅
 - KPIs com dados reais ✅
-- Controle de acesso (admin/manager/resident) ✅
-- Convite de usuários (Edge Function) ⚠️ 需要 deploy manual
+- Controle de acesso (admin/manager/resident/familiar) ✅
+- Onboarding via WhatsApp funcional ✅
+- Estabilidade de Queries (Fixed Join Errors) ✅
