@@ -23,6 +23,8 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Encomenda | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [unitResidents, setUnitResidents] = useState<{id: string, name: string, phone: string}[]>([]);
+  const [selectedResidentId, setSelectedResidentId] = useState('');
 
   const fetchBlocks = async () => {
     try {
@@ -63,7 +65,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
           delivered_at,
           notified_at,
           tracking_code,
-          profiles:profile_id(id, name, unit)
+          profiles:profile_id(id, name, unit, phone)
         `)
         .order('received_at', { ascending: false });
 
@@ -89,7 +91,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
           residentName: e.profiles?.name || 'Desconhecido',
           block: e.profiles?.unit ? e.profiles.unit.replace(/[0-9]/g, '').trim() : '',
           unit: e.profiles?.unit || '',
-          phone: '',
+          phone: e.profiles?.phone || '',
           description: e.description,
           trackingCode: e.tracking_code || '',
           status: e.status,
@@ -120,17 +122,11 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
       const selectedUnit = formData.get('unit') as string;
       const blockName = selectedUnit ? selectedUnit.replace(/[0-9]/g, '').trim() : selectedBlock || '';
       
-      // Buscar perfil do morador pela unidade (pega o primeiro disponível)
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, name, phone')
-        .eq('unit', selectedUnit)
-        .limit(1);
+      const selectedProfileId = selectedResidentId || formData.get('residentId') as string;
+      const resident = unitResidents.find(r => r.id === selectedProfileId);
       
-      const profileData = profiles?.[0];
-      
-      if (profileError || !profileData) {
-        alert('Apartamento não encontrado ou sem moradores cadastrados. Selecione um apartamento válido.');
+      if (!selectedProfileId || !resident) {
+        alert('Por favor, selecione o morador destino.');
         setIsLoading(false);
         return;
       }
@@ -141,7 +137,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
       const { data: encData, error: encError } = await supabase
         .from('encomendas')
         .insert({
-          profile_id: profileData.id,
+          profile_id: resident.id,
           description: formData.get('description') as string,
           tracking_code: formData.get('trackingCode') as string,
           status: 'pendente',
@@ -153,10 +149,10 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
       if (encError) throw encError;
 
       // Enviar notificação WhatsApp se estiver ativa
-      if (isAutoNotifyActive && profileData.phone) {
-        const phone = profileData.phone.replace(/\D/g, '');
+      if (isAutoNotifyActive && resident.phone) {
+        const phone = resident.phone.replace(/\D/g, '');
         const message = `*Nova Encomenda Recebida* 📦\n\n` +
-          `Olá ${profileData.name}!\n` +
+          `Olá ${resident.name}!\n` +
           `Você recebeu uma nova encomenda na portaria.\n\n` +
           `📋 Descrição: ${formData.get('description')}\n` +
           `🔢 Código: ${formData.get('trackingCode')}\n\n` +
@@ -174,10 +170,10 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
       // Atualizar lista local
       const newEnc: Encomenda = {
         id: encData.id,
-        residentName: profileData.name,
+        residentName: resident.name,
         block: blockName,
         unit: selectedUnit,
-        phone: profileData.phone,
+        phone: resident.phone,
         trackingCode: formData.get('trackingCode') as string,
         description: formData.get('description') as string,
         dateEntry: now.toLocaleString('pt-BR'),
@@ -188,6 +184,8 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
       setEncomendas([newEnc, ...encomendas]);
       setIsModalOpen(false);
       setSelectedBlock('');
+      setSelectedResidentId('');
+      setUnitResidents([]);
       
       if (isAutoNotifyActive) {
         alert(`Encomenda registrada e notificação enviada via WhatsApp para ${profileData.name}!`);
@@ -316,8 +314,23 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
               {filteredList.map(enc => (
                 <tr key={enc.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-8 py-5">
-                    <p className="font-black text-slate-800 uppercase text-xs tracking-tight">{enc.residentName}</p>
-                    <p className="text-[10px] text-gray-400 font-bold">Apartamento {enc.unit}</p>
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        <p className="font-black text-slate-800 uppercase text-xs tracking-tight">{enc.residentName}</p>
+                        <p className="text-[10px] text-gray-400 font-bold">Apartamento {enc.unit}</p>
+                      </div>
+                      {enc.phone && (
+                        <a 
+                          href={`https://wa.me/55${enc.phone.replace(/\D/g, '')}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="w-8 h-8 flex items-center justify-center bg-emerald-50 text-emerald-500 rounded-lg hover:bg-emerald-500 hover:text-white transition-all shadow-sm"
+                          title="Enviar Mensagem Direta"
+                        >
+                          <i className="fa-brands fa-whatsapp text-sm"></i>
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-5">
                     <p className="text-xs font-bold text-slate-600 tracking-tight">{enc.dateEntry.split(' ')[0]}</p>
@@ -450,6 +463,25 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
                   <select 
                     name="unit" 
                     required
+                    onChange={async (e) => {
+                      const unit = e.target.value;
+                      if (!unit) {
+                        setUnitResidents([]);
+                        return;
+                      }
+                      setIsLoading(true);
+                      try {
+                        const { data } = await supabase
+                          .from('profiles')
+                          .select('id, name, phone')
+                          .eq('unit', unit)
+                          .order('name');
+                        setUnitResidents(data || []);
+                        if (data && data.length === 1) setSelectedResidentId(data[0].id);
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
                     className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 outline-none focus:ring-2 focus:ring-yellow-400 transition-all"
                   >
                     <option value="">Selecione o apartamento</option>
@@ -458,6 +490,25 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-2 animate-in slide-in-from-top-2">
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Para qual Morador?</label>
+                <select 
+                  name="residentId"
+                  required
+                  value={selectedResidentId}
+                  onChange={(e) => setSelectedResidentId(e.target.value)}
+                  className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 outline-none focus:ring-2 focus:ring-yellow-400 transition-all"
+                >
+                  <option value="">Selecione o morador destino</option>
+                  {unitResidents.map(r => (
+                    <option key={r.id} value={r.id}>{r.name} {r.phone ? `(${r.phone})` : ''}</option>
+                  ))}
+                </select>
+                {unitResidents.length === 0 && selectedBlock && (
+                  <p className="text-[9px] text-red-400 font-bold uppercase mt-1 ml-1 animate-pulse italic">Nenhum morador encontrado nesta unidade.</p>
+                )}
               </div>
 
               <div className="space-y-2">

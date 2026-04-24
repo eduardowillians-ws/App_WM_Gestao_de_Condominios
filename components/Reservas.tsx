@@ -589,8 +589,8 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
       {selectedArea && !isReserving && !isEditing && !isCreatingArea && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setSelectedArea(null)}></div>
-          <div className="relative bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="h-80 relative">
+          <div className="relative bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-hide rounded-2xl md:rounded-[3rem] shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="h-48 md:h-80 relative">
                <img src={selectedArea.image} className="w-full h-full object-cover" />
                <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent"></div>
                <button onClick={() => setSelectedArea(null)} className="absolute top-6 right-6 w-12 h-12 bg-black/30 hover:bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-xl transition-all duration-300 shadow-xl">
@@ -610,9 +610,9 @@ const Reservas: React.FC<ReservasProps> = ({ userRole = 'resident', currentUser 
                </div>
             </div>
             
-            <div className="p-10 -mt-16 relative bg-white rounded-t-[3rem]">
-               <div className="flex flex-col mb-8">
-                    <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-4">{selectedArea.name}</h3>
+            <div className="p-6 md:p-10 -mt-12 md:-mt-16 relative bg-white rounded-t-[2.5rem] md:rounded-t-[3rem]">
+               <div className="flex flex-col mb-6 md:mb-8">
+                    <h3 className="text-2xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-3 md:mb-4">{selectedArea.name}</h3>
                     <div className="flex flex-wrap gap-8 text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">
                        <span className="flex items-center"><i className="fa-solid fa-users text-yellow-500 mr-2.5"></i> {selectedArea.capacity} PESSOAS</span>
                        <span className="flex items-center"><i className="fa-solid fa-tag text-yellow-500 mr-2.5"></i> TAXA: R$ {selectedArea.tax.toFixed(2)}</span>

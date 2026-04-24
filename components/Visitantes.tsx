@@ -206,15 +206,15 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
           unit: formData.get('unit') as string,
           host_name: currentUser.name,
           host_unit: currentUser.unit,
-          host_block: selectedBlock || block || null,
+          host_block: selectedBlock || block || currentUser.unit?.replace(/[0-9]/g, '').trim() || null,
           visitor_type: visitorType,
-          access_method: 'AUTORIZADO VIA APP',
+          access_method: 'QR CODE DIGITAL',
           status: 'approved',
           approved_by: currentUser.id,
           created_by: currentUser.id,
           qr_code: qrCode,
-          qr_expires_at: expiresAt,
-          entry_time: new Date().toISOString()
+          qr_expires_at: expiresAt
+          // entry_time deixamos como null para convites QR, só registra no acesso real
         })
         .select()
         .single();
@@ -402,7 +402,7 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
              <p className="text-[10px] text-gray-400 font-medium mt-2 leading-relaxed px-4">Cadastre moradores para acesso sem toque e alta segurança.</p>
          </button>
 
-         <button onClick={() => setActiveModal('qr')} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col items-center text-center group hover:shadow-xl transition-all">
+         <button onClick={() => setActiveModal('visitor')} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col items-center text-center group hover:shadow-xl transition-all">
              <div className="w-16 h-16 bg-yellow-50 text-yellow-600 rounded-3xl flex items-center justify-center mb-5 text-2xl group-hover:scale-110 transition-transform shadow-inner">
                  <i className="fa-solid fa-qrcode"></i>
              </div>
