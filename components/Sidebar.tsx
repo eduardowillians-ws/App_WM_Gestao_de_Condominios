@@ -50,7 +50,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, currentUser
         View.VOTACAO,
         View.DOCUMENTOS,
         View.MANUTENCAO,
-        View.MANUAL_SINDICO
+        View.MANUAL_SINDICO,
+        View.FINANCEIRO
       ].includes(item.id);
     }
 

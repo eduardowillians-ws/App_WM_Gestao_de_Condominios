@@ -236,6 +236,7 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 023_add_all_profiles_columns.sql ✅
 024_create_access_logs.sql     ✅
 035_create_resident_ledger.sql ✅
+036_update_finance_permissions.sql ✅
 ```
 
 ---
@@ -349,6 +350,24 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 
 ---
 
+### v3.3 - Otimização de Comodidade e Notificações (Encomendas)
+*   **Link Direto WhatsApp**: Adicionado atalho na listagem de encomendas para notificar moradores instantaneamente.
+*   **Seleção de Morador Destinatário**: O registro de encomendas agora permite selecionar qual morador da unidade receberá o pacote (Titular, Cônjuge, Dependente), melhorando a precisão da entrega.
+*   **Log de Notificações**: Registro automático do horário de envio da notificação aos moradores.
+
+### v3.4 - Rastreabilidade de Visitantes e Gestão de Torres
+*   **Torres Dinâmicas**: Refatoração completa para listar 100% das torres cadastradas no banco (`condo_blocks`), resolvendo o bug de exibir apenas uma torre.
+*   **Filtro de Ocupação**: Ao selecionar uma torre, o sistema agora filtra apenas os apartamentos que possuem moradores ativos, limpando o seletor para a portaria.
+*   **Morador Visitado (Rastreabilidade)**: Implementada a escolha obrigatória do morador específico que será visitado. O nome é gravado no log de acesso (`host_name`), garantindo segurança e histórico preciso para o síndico.
+*   **Cascata UI**: Fluxo de formulário inteligente: Torre → Apartamento Ocupado → Morador Específico.
+
+### v3.5 - Expansão de Acesso Administrativo (Zelador/Gerente)
+*   **Módulo Financeiro Desbloqueado**: O cargo `manager` agora possui acesso total ao módulo financeiro (Fluxo de Caixa e Gestão de Unidades).
+*   **Políticas de RLS Atualizadas**: Migração aplicada para permitir que o Zelador crie lançamentos, anexe comprovantes e gerencie cobranças de moradores.
+*   **Consistência de Privilégios**: Unificação das funções de Admin e Manager para operações rotineiras de gestão condominial.
+
+---
+
 ## 📝 Status Atual
 - Dashboard com dados reais ✅
 - Filtros de mês/ano funcionando ✅
@@ -359,4 +378,5 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 - Bug Fix (ReferenceError in Documents) ✅
 - Faturamento em Lote Automatizado ✅
 - Padronização 'Apartamento' Concluída ✅
-- Status de Convite Dinâmico ✅
+- Status de Convite Dinâmico ✅- Rastreabilidade de Morador Visitado ?
+- Financeiro liberado para o Zelador ?

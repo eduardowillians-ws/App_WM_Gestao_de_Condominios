@@ -88,7 +88,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
   const [receiptFilePreview, setReceiptFilePreview] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isAdmin = userRole === 'admin';
+  const isAdmin = userRole === 'admin' || userRole === 'manager';
 
   useEffect(() => {
     fetchEntries();
