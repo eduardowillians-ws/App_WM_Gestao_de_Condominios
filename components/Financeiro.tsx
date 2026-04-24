@@ -100,7 +100,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, unit')
+        .select('id, name, unit, role')
         .eq('status', 'active');
       if (error) throw error;
       setResidents(data || []);
