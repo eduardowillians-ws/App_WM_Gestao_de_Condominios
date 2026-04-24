@@ -130,7 +130,7 @@ const App: React.FC = () => {
         return <Equipe />;
       case View.VOTACAO: return <Assembleias userRole={currentUser.role} currentUser={currentUser} />;
       case View.FINANCEIRO: 
-        if (isResident || isManager) return <Dashboard />;
+        if (isResident) return <Dashboard />;
         return <Financeiro userRole={currentUser.role} currentUser={currentUser} />;
       case View.MORADORES: 
         if (isResident) return <Dashboard />;
