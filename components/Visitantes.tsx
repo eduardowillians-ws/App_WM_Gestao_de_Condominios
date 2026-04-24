@@ -31,40 +31,43 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
   const [selectedBlock, setSelectedBlock] = useState('');
   const [formRg, setFormRg] = useState('');
   const [formCpf, setFormCpf] = useState('');
+  const [unitResidents, setUnitResidents] = useState<{id: string, name: string}[]>([]);
+  const [occupiedUnits, setOccupiedUnits] = useState<string[]>([]);
+  const [selectedResidentName, setSelectedResidentName] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const fetchBlocks = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('unit')
-        .eq('role', 'resident');
+        .from('condo_blocks')
+        .select('*')
+        .order('name');
       
       if (error) throw error;
       
-      // Extrai blocos únicos das unidades
-      const unitsByBlock: Record<string, string[]> = {};
-      (data || []).forEach((p: any) => {
-        const unit = p.unit || '';
-        if (unit) {
-          const blockName = unit.replace(/[0-9]/g, '').trim() || 'Torre A';
-          if (!unitsByBlock[blockName]) unitsByBlock[blockName] = [];
-          if (!unitsByBlock[blockName].includes(unit)) {
-            unitsByBlock[blockName].push(unit);
+      if (data && data.length > 0) {
+        setBlocks(data.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          units: (b.units || []).sort()
+        })));
+      } else {
+        // Fallback para perfis se condo_blocks estiver vazio
+        const { data: profData } = await supabase.from('profiles').select('unit').eq('role', 'resident');
+        const unitsByBlock: Record<string, string[]> = {};
+        (profData || []).forEach((p: any) => {
+          const unit = p.unit || '';
+          if (unit) {
+            const blockName = unit.replace(/[0-9]/g, '').trim() || 'Torre A';
+            if (!unitsByBlock[blockName]) unitsByBlock[blockName] = [];
+            if (!unitsByBlock[blockName].includes(unit)) unitsByBlock[blockName].push(unit);
           }
-        }
-      });
-      
-      const blockList = Object.entries(unitsByBlock).map(([name, units]) => ({
-        id: name,
-        name,
-        units: units.sort()
-      })).sort((a, b) => a.name.localeCompare(b.name));
-      
-      setBlocks(blockList);
+        });
+        setBlocks(Object.entries(unitsByBlock).map(([name, units]) => ({ id: name, name, units: units.sort() })));
+      }
     } catch (err) {
-      console.log('No blocks:', err);
-      setBlocks([{ id: 'Torre A', name: 'Torre A', units: ['101', '102', '201', '202', '301', '302'] }]);
+      console.log('Error fetching blocks:', err);
+      setBlocks([{ id: 'Torre A', name: 'Torre A', units: ['101', '102', '201'] }]);
     }
   };
 
@@ -204,8 +207,8 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
           visitor_rg: formRg || null,
           visitor_cpf: formCpf || null,
           unit: formData.get('unit') as string,
-          host_name: currentUser.name,
-          host_unit: currentUser.unit,
+          host_name: selectedResidentName || currentUser.name,
+          host_unit: formData.get('unit') as string || currentUser.unit,
           host_block: selectedBlock || block || currentUser.unit?.replace(/[0-9]/g, '').trim() || null,
           visitor_type: visitorType,
           access_method: 'QR CODE DIGITAL',
@@ -674,7 +677,31 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
                   <select 
                     name="block" 
                     value={selectedBlock}
-                    onChange={(e) => setSelectedBlock(e.target.value)}
+                    onChange={async (e) => {
+                      const blockName = e.target.value;
+                      setSelectedBlock(blockName);
+                      setOccupiedUnits([]); // Limpa enquanto carrega
+                      setUnitResidents([]);
+                      setSelectedResidentName('');
+                      
+                      if (!blockName) return;
+
+                      // Buscar unidades ocupadas deste bloco
+                      try {
+                        const { data } = await supabase
+                          .from('profiles')
+                          .select('unit')
+                          .eq('role', 'resident')
+                          .ilike('unit', `%${blockName}%`) // Assume que a unidade contém o nome do bloco
+                          .order('unit');
+                        
+                        // Extrair units únicas
+                        const units = Array.from(new Set((data || []).map(p => p.unit))).sort();
+                        setOccupiedUnits(units);
+                      } catch (err) {
+                        console.error('Erro ao buscar unidades:', err);
+                      }
+                    }}
                     className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
                   >
                     <option value="">Selecione o bloco</option>
@@ -689,14 +716,60 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Apartamento</label>
                 <select 
                   name="unit" 
+                  required
+                  onChange={async (e) => {
+                    const unit = e.target.value;
+                    if (!unit) {
+                      setUnitResidents([]);
+                      return;
+                    }
+                    setIsLoading(true);
+                    try {
+                      const { data } = await supabase
+                        .from('profiles')
+                        .select('id, name')
+                        .eq('unit', unit)
+                        .order('name');
+                      setUnitResidents(data || []);
+                      if (data && data.length === 1) setSelectedResidentName(data[0].name);
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
                   className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
                 >
                   <option value="">Selecione o apartamento</option>
-                  {blocks.find(b => b.name === selectedBlock)?.units.map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  )) || (currentUser?.unit && <option value={currentUser.unit}>{currentUser.unit}</option>)}
+                  {occupiedUnits.length > 0 ? (
+                    occupiedUnits.map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))
+                  ) : (
+                    // Caso não tenha carregado via API, tenta pegar do objeto blocks como fallback
+                    blocks.find(b => b.name === selectedBlock)?.units.map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))
+                  )}
+                  {(!occupiedUnits.length && currentUser?.unit) && <option value={currentUser.unit}>{currentUser.unit}</option>}
                 </select>
               </div>
+
+              {unitResidents.length > 0 && (
+                <div className="space-y-2 animate-in slide-in-from-top-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Morador Visitado</label>
+                  <select 
+                    name="host_name"
+                    required
+                    value={selectedResidentName}
+                    onChange={(e) => setSelectedResidentName(e.target.value)}
+                    className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
+                  >
+                    <option value="">Selecione o morador</option>
+                    {unitResidents.map(r => (
+                      <option key={r.id} value={r.name}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="pt-2 sm:pt-4">
                 <button type="submit" disabled={isLoading} className="w-full py-4 sm:py-6 mycond-bg-yellow rounded-xl sm:rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg hover:bg-yellow-500 transition-all disabled:opacity-50">
