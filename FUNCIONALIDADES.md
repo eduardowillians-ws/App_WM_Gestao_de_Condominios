@@ -235,6 +235,7 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 022_add_exit_date_to_profiles.sql ✅
 023_add_all_profiles_columns.sql ✅
 024_create_access_logs.sql     ✅
+035_create_resident_ledger.sql ✅
 ```
 
 ---
@@ -337,6 +338,15 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 *   **Integração de Fluxo**: Pagamentos confirmados na gestão de unidades geram automaticamente entradas no Fluxo de Caixa Geral.
 *   **Status Inteligente**: Identificação visual de pagamentos pendentes, liquidados e em atraso.
 
+### v3.2 - Automação Operacional e Faturamento em Lote
+*   **Faturamento em Lote (Batch Billing)**: Funcionalidade para geração massiva de cobranças mensais para todos os moradores ativos com um único clique.
+*   **Filtro Inteligente de Titulares**: O sistema identifica automaticamente quem é o morador titular (role: resident), ignorando familiares para evitar cobranças duplicadas na mesma unidade.
+*   **Padronização para 'Apartamento'**: Substituição global do termo técnico "Unidade" por "Apartamento" em toda a interface, menus, botões e relatórios para uma linguagem mais humana.
+*   **Status Dinâmico de Convites**: O histórico de convites agora reflete em tempo real se o morador já ativou seu perfil, comparando a atividade do usuário no banco de dados.
+*   **Badges de Categorização**: Diferenciação visual imediata entre "Aluguel" (Vermelho/Rose) e "Taxa Condominial" (Slate) no histórico financeiro.
+*   **Gestão de Inadimplência Automática**: O status "Atrasado" agora é calculado dinamicamente pelo sistema comparando o vencimento com a data atual, sem intervenção humana.
+*   **Correção de Sincronização Supabase**: Otimização das consultas de perfis para garantir que permissões (role) e status (active) sejam sempre validados corretamente.
+
 ---
 
 ## 📝 Status Atual
@@ -347,3 +357,6 @@ Este documento serve como a **Bíblia de Funcionalidades** da plataforma.
 - Onboarding via WhatsApp funcional ✅
 - Estabilidade de Queries (Fixed Join Errors) ✅
 - Bug Fix (ReferenceError in Documents) ✅
+- Faturamento em Lote Automatizado ✅
+- Padronização 'Apartamento' Concluída ✅
+- Status de Convite Dinâmico ✅

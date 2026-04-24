@@ -795,6 +795,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
                     <tr className="bg-gray-50/50 border-b border-gray-100 font-black text-[10px] text-gray-400 uppercase tracking-widest">
                       <th className="px-10 py-6">Apartamento</th>
                       <th className="px-6 py-6">Morador</th>
+                      <th className="px-6 py-6 text-center">Tipo</th>
                       <th className="px-6 py-6 text-center">Vencimento</th>
                       <th className="px-6 py-6 text-right">Valor</th>
                       <th className="px-8 py-6 text-center">Status</th>
@@ -804,9 +805,9 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
                   <tbody className="divide-y divide-gray-50">
                     {filteredLedgerEntries.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-10 py-20 text-center text-gray-300">
-                          <i className="fa-solid fa-receipt text-5xl mb-4"></i>
-                          <p className="font-black uppercase text-xs">Nenhuma cobrança encontrada no período.</p>
+                        <td colSpan={7} className="px-10 py-20 text-center text-gray-300">
+                           <i className="fa-solid fa-receipt text-5xl mb-4"></i>
+                           <p className="font-black uppercase text-xs">Nenhuma cobrança encontrada no período.</p>
                         </td>
                       </tr>
                     ) : (
@@ -819,19 +820,35 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
                             <p className="text-xs font-black text-slate-800 uppercase">{l.resident_name}</p>
                           </td>
                           <td className="px-6 py-6 text-center">
+                            <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                              l.type === 'Aluguel' 
+                                ? 'bg-rose-50 text-rose-500 border-rose-100 shadow-sm shadow-rose-100/50' 
+                                : 'bg-slate-100 text-slate-500 border-slate-200'
+                            }`}>
+                              {l.type || 'N/I'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-6 text-center">
                             <p className="text-xs font-black text-slate-600">{l.due_date ? new Date(l.due_date + 'T12:00:00').toLocaleDateString('pt-BR') : '---'}</p>
                           </td>
                           <td className="px-6 py-6 text-right">
                             <span className="text-sm font-black text-slate-900">R$ {l.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                           </td>
                           <td className="px-8 py-6 text-center">
-                            <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                              l.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                              l.status === 'overdue' ? 'bg-red-50 text-red-600 border-red-100' :
-                              'bg-yellow-50 text-yellow-600 border-yellow-100'
-                            }`}>
-                              {l.status === 'paid' ? 'Liquidado' : l.status === 'overdue' ? 'Atrasado' : 'Pendente'}
-                            </span>
+                            {(() => {
+                              const isOverdue = l.status !== 'paid' && l.due_date && new Date(l.due_date + 'T23:59:59') < new Date();
+                              const status = isOverdue ? 'overdue' : l.status;
+                              
+                              return (
+                                <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                  status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                  status === 'overdue' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                  'bg-yellow-50 text-yellow-600 border-yellow-100'
+                                }`}>
+                                  {status === 'paid' ? 'Liquidado' : status === 'overdue' ? 'Atrasado' : 'Pendente'}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="px-10 py-4 text-right relative">
                             <button 

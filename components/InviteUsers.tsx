@@ -23,6 +23,7 @@ interface InviteRecord {
   status: 'pending' | 'accepted' | 'expired';
   created_at: string;
   temp_password: string;
+  dynamicStatus?: string; // Status calculado em tempo real
 }
 
 const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
@@ -43,13 +44,40 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
   const fetchInvites = async () => {
     setIsLoadingInvites(true);
     try {
-      const { data, error } = await supabase
+      // 1. Busca convites
+      const { data: inviteData, error: inviteError } = await supabase
         .from('invites')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
-      setInvites(data || []);
+      if (inviteError) throw inviteError;
+
+      // 2. Busca perfis para comparar atividade
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('email, status, created_at, updated_at');
+      
+      if (profileError) throw profileError;
+
+      // 3. Mescla os dados para determinar o status real
+      const mergedInvites = (inviteData || []).map(inv => {
+        const profile = (profileData || []).find(p => p.email === inv.email);
+        let dynamicStatus = inv.status;
+
+        if (profile) {
+          // Se o perfil existe e foi atualizado após a criação, assumimos que o usuário acessou/ativou
+          const createdAt = new Date(profile.created_at).getTime();
+          const updatedAt = new Date(profile.updated_at).getTime();
+          
+          if (updatedAt > createdAt || profile.status === 'active') {
+            dynamicStatus = 'accepted';
+          }
+        }
+
+        return { ...inv, dynamicStatus };
+      });
+
+      setInvites(mergedInvites);
     } catch (err) {
       console.error('Erro ao buscar convites:', err);
     } finally {
@@ -63,7 +91,8 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
 
   const filteredInvites = useMemo(() => {
     return invites.filter(inv => {
-      const matchStatus = filterStatus === 'all' || inv.status === filterStatus;
+      const currentStatus = inv.dynamicStatus || inv.status;
+      const matchStatus = filterStatus === 'all' || currentStatus === filterStatus;
       const matchRole = filterRole === 'all' || inv.role === filterRole;
       return matchStatus && matchRole;
     });
@@ -152,7 +181,8 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
     window.open(waUrl, '_blank');
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (invite: InviteRecord) => {
+    const status = invite.dynamicStatus || invite.status;
     switch (status) {
       case 'accepted': return <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase">Ativado</span>;
       case 'expired': return <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-black uppercase">Expirado</span>;
@@ -365,7 +395,7 @@ const InviteUsers: React.FC<InviteUsersProps> = ({ currentUser }) => {
                     </span>
                   </td>
                   <td className="px-4 py-6">
-                    {getStatusBadge(inv.status)}
+                    {getStatusBadge(inv)}
                   </td>
                   <td className="px-4 py-6">
                     <span className="text-[10px] font-bold text-gray-400">{new Date(inv.created_at).toLocaleDateString('pt-BR')}</span>
