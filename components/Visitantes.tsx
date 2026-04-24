@@ -449,7 +449,7 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
                                   visitor.type === 'SERVIÇO' ? 'bg-purple-100 text-purple-600' :
                                   'bg-gray-100 text-gray-600'
                                 }`}>{visitor.type}</span>
-                                <span className="text-[10px] text-gray-400 font-medium uppercase">• Unidade {visitor.unit}</span>
+                                <span className="text-[10px] text-gray-400 font-medium uppercase">• Apartamento {visitor.unit}</span>
                             </div>
                         </div>
                     </div>
@@ -515,7 +515,7 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
                          }}
                          className="w-full bg-white border-none rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-5 font-bold text-slate-800 shadow-sm outline-none text-sm"
                        >
-                         <option value="">Selecione a Unidade</option>
+                         <option value="">Selecione o Apartamento</option>
                          {blocks.map(b => (
                            <optgroup key={b.id} label={b.name}>
                              {b.units.map(u => (
@@ -686,12 +686,12 @@ const Visitantes: React.FC<VisitantesProps> = ({ userRole = 'resident', currentU
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Apartamento/Unidade</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Apartamento</label>
                 <select 
                   name="unit" 
                   className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-4 font-black text-slate-800 shadow-inner outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
                 >
-                  <option value="">Selecione a unidade</option>
+                  <option value="">Selecione o apartamento</option>
                   {blocks.find(b => b.name === selectedBlock)?.units.map(u => (
                     <option key={u} value={u}>{u}</option>
                   )) || (currentUser?.unit && <option value={currentUser.unit}>{currentUser.unit}</option>)}

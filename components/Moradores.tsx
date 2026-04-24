@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Resident, CondoBlock } from '../types';
 import { supabase } from '../lib/supabase';
@@ -381,7 +380,7 @@ const Moradores: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Moradores e Unidades</h2>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase">Moradores e Apartamentos</h2>
           <p className="text-sm text-gray-500 font-medium">Gestão da planta do condomínio e base de dados de residentes.</p>
         </div>
         <div className="flex gap-3">
@@ -401,7 +400,7 @@ const Moradores: React.FC = () => {
                   className="w-full px-4 py-3 text-left text-xs font-black uppercase text-slate-600 hover:bg-slate-50 rounded-xl"
                 >
                   <i className="fa-solid fa-pen mr-2 text-yellow-500"></i>
-                  {block.name} ({block.totalUnits} unidades)
+                  {block.name} ({block.totalUnits} apartamentos)
                 </button>
               ))}
               <button
@@ -468,7 +467,7 @@ const Moradores: React.FC = () => {
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100 font-black text-[10px] text-gray-400 uppercase tracking-widest">
                     <th className="px-10 py-6">Morador</th>
-                    <th className="px-6 py-6">Unidade / Bloco</th>
+                    <th className="px-6 py-6">Apartamento / Bloco</th>
                     <th className="px-6 py-6">Contato</th>
                     <th className="px-6 py-6 text-center">Status</th>
                     <th className="px-10 py-6 text-right">Ações</th>
@@ -484,7 +483,7 @@ const Moradores: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-6">
-                        <p className="text-xs font-black text-slate-800">UNIDADE {res.unit}</p>
+                        <p className="text-xs font-black text-slate-800">APARTAMENTO {res.unit}</p>
                         <p className="text-[9px] text-gray-400 font-black uppercase">
                           {res.block_id ? (
                             blocks.find(b => b.id === res.block_id)?.name || res.block_id
@@ -576,7 +575,7 @@ const Moradores: React.FC = () => {
                     return (
                       <div 
                         key={u} 
-                        onClick={() => resident ? setViewingResident(resident) : alert('Unidade Vaga. Cadastre um morador nesta unidade.')}
+                        onClick={() => resident ? setViewingResident(resident) : alert('Apartamento Vago. Cadastre um morador neste apartamento.')}
                         className={`aspect-square rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all border-2 ${resident ? 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100 shadow-emerald-100/50' : 'bg-slate-50 border-slate-100 text-slate-400 hover:bg-white hover:border-yellow-400'}`}
                       >
                          <span className="text-[11px] font-black">{u}</span>
@@ -613,7 +612,7 @@ const Moradores: React.FC = () => {
               </div>
               <div className="p-10 space-y-6">
                 <div className="bg-slate-50 p-6 rounded-2xl space-y-2">
-                  <p className="text-[10px] text-gray-400 font-black uppercase">Unidade Atual</p>
+                  <p className="text-[10px] text-gray-400 font-black uppercase">Apartamento Atual</p>
                   <p className="font-black text-slate-800">{blocks.find(b => b.id === transferData.blockId)?.name || transferData.blockId} - Apto {transferData.unit}</p>
                 </div>
                 
@@ -671,7 +670,7 @@ const Moradores: React.FC = () => {
           <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={() => setIsBlockModalOpen(false)}></div>
           <div className="relative bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="px-10 py-8 mycond-bg-blue text-white flex justify-between items-center">
-              <div><h3 className="text-2xl font-black uppercase tracking-tighter">Configurar Unidade</h3><p className="text-[10px] text-blue-200 font-bold uppercase">Arquitetura do Condomínio</p></div>
+              <div><h3 className="text-2xl font-black uppercase tracking-tighter">Configurar Apartamento</h3><p className="text-[10px] text-blue-200 font-bold uppercase">Arquitetura do Condomínio</p></div>
               <button onClick={() => setIsBlockModalOpen(false)} className="w-12 h-12 rounded-full hover:bg-white/10 flex items-center justify-center"><i className="fa-solid fa-xmark"></i></button>
             </div>
             <form onSubmit={handleSaveBlock} className="p-10 space-y-6">
@@ -747,7 +746,7 @@ const Moradores: React.FC = () => {
                        </select>
                     </div>
                     <div className="space-y-2">
-                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unidade</label>
+                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Apartamento</label>
                        {(() => {
                          const selectedBlock = blocks.find(b => b.id === formBlockId);
                          const availableUnits = selectedBlock?.units || [];
@@ -846,8 +845,8 @@ const Moradores: React.FC = () => {
                    <div className="flex justify-between"><span className="text-[9px] font-black text-gray-400 uppercase">Profissão</span><span className="text-[11px] font-black text-slate-800 uppercase">{viewingResident.profession || 'N/I'}</span></div>
                 </div>
                 <div className="p-8 bg-slate-50 rounded-[2.5rem] space-y-4 shadow-inner">
-                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-2">Unidade e Contrato</p>
-                   <div className="flex justify-between"><span className="text-[9px] font-black text-gray-400 uppercase">Unidade</span><span className="text-[11px] font-black text-slate-800 uppercase">{viewingResident.unit}</span></div>
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-2">Apartamento e Contrato</p>
+                   <div className="flex justify-between"><span className="text-[9px] font-black text-gray-400 uppercase">Apartamento</span><span className="text-[11px] font-black text-slate-800 uppercase">{viewingResident.unit}</span></div>
                    <div className="flex justify-between"><span className="text-[9px] font-black text-gray-400 uppercase">Entrada</span><span className="text-[11px] font-black text-slate-800">{viewingResident.entryDate?.split('-').reverse().join('/') || '--/--/----'}</span></div>
                    <div className="flex justify-between"><span className="text-[9px] font-black text-gray-400 uppercase">Vencimentos</span><span className="text-[11px] font-black text-emerald-500 uppercase">EM DIA</span></div>
                 </div>

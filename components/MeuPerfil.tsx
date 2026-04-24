@@ -216,7 +216,7 @@ const handleInviteDependent = async (e: React.FormEvent) => {
             </div>
             <input type="file" ref={photoInputRef} onChange={handlePhotoUpload} className="hidden" accept="image/*" />
             <h3 className="text-xl font-black text-slate-800 uppercase mt-4 tracking-tight">{name}</h3>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Unidade {currentUser.unit}</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Apartamento {currentUser.unit}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -267,9 +267,9 @@ const handleInviteDependent = async (e: React.FormEvent) => {
                 <div className="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center text-slate-800 shadow-lg">
                     <i className="fa-solid fa-users text-xl"></i>
                 </div>
-                <div>
-                    <h5 className="font-black text-xl text-yellow-900 uppercase tracking-tighter">Dependentes e Familiares</h5>
-                    <p className="text-xs text-yellow-700 font-medium max-w-lg mt-1">Conceda acesso para membros da sua família. Eles herdarão a mesma Unidade.</p>
+                <div className="flex-1">
+                    <h5 className="font-black text-xl text-yellow-900 uppercase tracking-tighter">Família e Dependentes</h5>
+                    <p className="text-xs text-yellow-700 font-medium max-w-lg mt-1">Conceda acesso para membros da sua família. Eles herdarão o mesmo Apartamento.</p>
                 </div>
             </div>
 

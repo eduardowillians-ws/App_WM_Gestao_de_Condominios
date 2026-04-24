@@ -22,7 +22,7 @@ const YEARS = [
 ];
 
 const BLOCKS = [
-  { id: 'ALL', name: 'Todas as Unidades' },
+  { id: 'ALL', name: 'Todos os Apartamentos' },
   { id: 'b1', name: 'Torre 1 (Alpha)' },
   { id: 'b2', name: 'Torre 2 (Beta)' },
   { id: 'b3', name: 'Bloco C' }
@@ -510,7 +510,7 @@ const Dashboard: React.FC = () => {
               <div className="space-y-5">
                 {[
                   { label: 'Saúde Financeira', sub: 'Saldo positivo', ok: managementKPIs.points.saldo },
-                  { label: 'Ocupação de Unidades', sub: 'Taxa acima de 80%', ok: managementKPIs.points.ocupacao },
+                  { label: 'Ocupação de Apartamentos', sub: 'Taxa acima de 80%', ok: managementKPIs.points.ocupacao },
                   { label: 'Taxa de Ocorrências', sub: 'Volume controlado', ok: managementKPIs.points.ocorrencias },
                   { label: 'Crescimento de Áreas', sub: 'Reservas em alta', ok: managementKPIs.points.reservas },
                   { label: 'Eficiência Logística', sub: 'Prazos reduzidos', ok: managementKPIs.points.encomendas },
@@ -553,7 +553,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="flex flex-col">
-          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Unidades</label>
+          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Apartamentos</label>
           <div className="relative">
             <select 
               value={selectedBlock} 
@@ -564,7 +564,7 @@ const Dashboard: React.FC = () => {
                 ? blocksList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)
                 : BLOCKS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)
               }
-              <option value="ALL">Todas as Unidades</option>
+              <option value="ALL">Todos os Apartamentos</option>
             </select>
             <i className="fa-solid fa-building absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-[10px]"></i>
           </div>
@@ -721,7 +721,7 @@ const Dashboard: React.FC = () => {
 
         <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100 flex flex-col">
           <div className="flex justify-between items-center mb-6">
-            <h4 className="font-bold text-slate-800 uppercase text-[10px] tracking-[0.2em]">Ocupação de Unidades</h4>
+            <h4 className="font-bold text-slate-800 uppercase text-[10px] tracking-[0.2em]">Ocupação de Apartamentos</h4>
             <span className={`text-[9px] font-bold ${managementKPIs.points.ocupacao ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-red-500 bg-red-50 border-red-100'} px-3 py-1 rounded-full uppercase tracking-widest border transition-all`}>
                 {occupationData[0].value}% Ocupado
             </span>
@@ -754,14 +754,14 @@ const Dashboard: React.FC = () => {
                <div className="flex items-center justify-between group">
                   <div className="flex items-center space-x-3">
                      <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
-                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unidades Ocupadas</span>
+                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Apartamentos Ocupados</span>
                   </div>
                   <span className="text-sm font-bold text-slate-800">{occupationData[0].value}%</span>
                </div>
                <div className="flex items-center justify-between group">
                   <div className="flex items-center space-x-3">
                      <div className="w-3 h-3 bg-slate-200 rounded-full"></div>
-                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unidades Vagas</span>
+                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Apartamentos Vagos</span>
                   </div>
                   <span className="text-sm font-bold text-slate-800">{occupationData[1].value}%</span>
                </div>

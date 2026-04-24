@@ -100,7 +100,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, unit, role')
+        .select('id, name, unit, role, status')
         .eq('status', 'active');
       if (error) throw error;
       setResidents(data || []);
@@ -226,8 +226,13 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
       const type = formData.get('type') as string;
       const period = formData.get('period') as string; // Ex: 2026-04
 
-      // Filtra apenas moradores (ignora familiares) e que estejam ativos
-      const activeResidents = residents.filter(r => (r.role === 'resident' || r.role === 'manager'));
+      // Filtra moradores/gestores ativos e que POSSUAM apartamento vinculado (unit não nulo)
+      const activeResidents = residents.filter(r => 
+        (r.role === 'resident' || r.role === 'manager') && 
+        r.unit && 
+        r.unit !== 'NULL' && 
+        r.unit !== ''
+      );
 
       if (activeResidents.length === 0) {
         throw new Error('Nenhum morador ativo encontrado para faturamento.');
@@ -766,7 +771,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
            <div className="bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-10 py-8 border-b border-gray-50 flex justify-between items-center bg-slate-50/50">
                 <div>
-                    <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Histórico de Cobranças por Unidade</h4>
+                    <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Histórico de Cobranças por Apartamento</h4>
                     <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">{filteredLedgerEntries.length} registros no período</p>
                  </div>
                 <div className="flex gap-4">
@@ -788,7 +793,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-100 font-black text-[10px] text-gray-400 uppercase tracking-widest">
-                      <th className="px-10 py-6">Unidade</th>
+                      <th className="px-10 py-6">Apartamento</th>
                       <th className="px-6 py-6">Morador</th>
                       <th className="px-6 py-6 text-center">Vencimento</th>
                       <th className="px-6 py-6 text-right">Valor</th>
@@ -1067,12 +1072,12 @@ const Financeiro: React.FC<FinanceiroProps> = ({ userRole = 'resident', currentU
           <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-2xl animate-in fade-in" onClick={() => setIsLedgerModalOpen(false)}></div>
           <div className="relative bg-white w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="px-14 py-12 mycond-bg-blue text-white flex justify-between items-center">
-              <div><h3 className="text-3xl font-black uppercase tracking-tighter">Cobrança de Unidade</h3><p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Aluguel & Taxas Mensais</p></div>
+              <div><h3 className="text-3xl font-black uppercase tracking-tighter">Cobrança de Apartamento</h3><p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Aluguel & Taxas Mensais</p></div>
               <button onClick={() => setIsLedgerModalOpen(false)} className="w-14 h-14 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
             </div>
             <form onSubmit={handleRegisterLedger} className="p-14 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
               <div className="space-y-3">
-                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Selecionar Morador / Unidade</label>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Selecionar Morador / Apartamento</label>
                 <select required name="profile_id" className="w-full bg-slate-50 border-none rounded-2xl px-8 py-5 font-black text-slate-800 outline-none shadow-inner">
                   <option value="">Selecione o morador...</option>
                   {residents.map(r => <option key={r.id} value={r.id}>{r.name} - Apt {r.unit}</option>)}

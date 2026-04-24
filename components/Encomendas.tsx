@@ -130,7 +130,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
       const profileData = profiles?.[0];
       
       if (profileError || !profileData) {
-        alert('Unidade não encontrada ou sem moradores cadastrados. Selecione uma unidade válida.');
+        alert('Apartamento não encontrado ou sem moradores cadastrados. Selecione um apartamento válido.');
         setIsLoading(false);
         return;
       }
@@ -304,7 +304,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
           <table className="w-full text-left">
             <thead className="bg-gray-50/50 border-b border-gray-100">
               <tr>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Residente / Unidade</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Residente / Apartamento</th>
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Entrada</th>
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Notificação</th>
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Saída</th>
@@ -317,7 +317,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
                 <tr key={enc.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-8 py-5">
                     <p className="font-black text-slate-800 uppercase text-xs tracking-tight">{enc.residentName}</p>
-                    <p className="text-[10px] text-gray-400 font-bold">Unidade {enc.unit}</p>
+                    <p className="text-[10px] text-gray-400 font-bold">Apartamento {enc.unit}</p>
                   </td>
                   <td className="px-6 py-5">
                     <p className="text-xs font-bold text-slate-600 tracking-tight">{enc.dateEntry.split(' ')[0]}</p>
@@ -446,13 +446,13 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unidade</label>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Apartamento</label>
                   <select 
                     name="unit" 
                     required
                     className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-800 outline-none focus:ring-2 focus:ring-yellow-400 transition-all"
                   >
-                    <option value="">Selecione a unidade</option>
+                    <option value="">Selecione o apartamento</option>
                     {blocks.find(b => b.name === selectedBlock)?.units.map(u => (
                       <option key={u} value={u}>{u}</option>
                     ))}
@@ -503,7 +503,7 @@ const Encomendas: React.FC<EncomendasProps> = ({ userRole = 'resident', currentU
                          <span className="font-black text-slate-800 uppercase">{selectedPackage.residentName}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                         <span className="font-bold text-slate-400">Unidade:</span>
+                         <span className="font-bold text-slate-400">Apartamento:</span>
                          <span className="font-black text-slate-800 uppercase">{selectedPackage.unit}</span>
                       </div>
                       <div className="pt-2 border-t border-gray-200">
